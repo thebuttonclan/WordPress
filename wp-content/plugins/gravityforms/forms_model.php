@@ -6,7 +6,8 @@ if ( ! class_exists( 'GFForms' ) ) {
 
 require_once( ABSPATH . WPINC . '/post.php' );
 
-define( 'GFORMS_MAX_FIELD_LENGTH', 200 );
+// Upgraded value columns can hold 4GB
+define( 'GFORMS_MAX_FIELD_LENGTH', get_option( 'gform_longtext_ready' ) ? 4294967295 : 200 );
 
 class GFFormsModel {
 
@@ -2996,7 +2997,8 @@ class GFFormsModel {
 		if ( ! rgblank( $value ) ) {
 
 			$value           = gf_apply_filters( 'gform_save_field_value', array( $form['id'], $field->id ), $value, $lead, $field, $form, $input_id );
-			$truncated_value = GFCommon::safe_substr( $value, 0, GFORMS_MAX_FIELD_LENGTH );
+
+			$truncated_value = get_option( 'gform_longtext_ready' ) ? $value : GFCommon::safe_substr( $value, 0, GFORMS_MAX_FIELD_LENGTH );
 
 			if ( $lead_detail_id > 0 ) {
 
