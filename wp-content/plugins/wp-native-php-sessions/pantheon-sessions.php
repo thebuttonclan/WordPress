@@ -1,11 +1,11 @@
 <?php
 /*
-Plugin Name: Pantheon Sessions for WordPress
-Version: 0.3-alpha
-Description: Offload PHP sessions to your database for multi-server compatibility.
+Plugin Name: Native PHP Sessions for WordPress
+Version: 0.4
+Description: Offload PHP's native sessions to your database for multi-server compatibility.
 Author: Pantheon
-Author URI: https://www.getpantheon.com/
-Plugin URI: https://www.getpantheon.com/
+Author URI: https://www.pantheon.io/
+Plugin URI: https://www.pantheon.io/
 Text Domain: pantheon-sessions
 Domain Path: /languages
 */
@@ -127,31 +127,8 @@ class Pantheon_Sessions {
 	 * Largely adopted from Drupal 7's implementation
 	 */
 	private function initialize_session_override() {
-
 		session_set_save_handler( '_pantheon_session_open', '_pantheon_session_close', '_pantheon_session_read', '_pantheon_session_write', '_pantheon_session_destroy', '_pantheon_session_garbage_collection' );
-
 		require_once dirname( __FILE__ ) . '/inc/class-session.php';
-
-		// We use !empty() in the following check to ensure that blank session IDs are not valid.
-		if ( ! empty( $_COOKIE[ session_name() ] ) || ( is_ssl() && ! empty( $_COOKIE[ substr(session_name(), 1) ] ) ) ) {
-			// If a session cookie exists, initialize the session. Otherwise the
-			// session is only started on demand in _pantheon_session_write(), making
-			// anonymous users not use a session cookie unless something is stored in
-			// $_SESSION. This allows HTTP proxies to cache anonymous pageviews.
-			if ( get_current_user_id() || ! empty( $_SESSION ) ) {
-				nocache_headers();
-			}
-		} else {
-			// Set a session identifier for this request. This is necessary because
-			// we lazily start sessions at the end of this request
-			session_id( $this->get_random_key() );
-			if ( is_ssl() ) {
-				$insecure_session_name = substr( session_name(), 1 );
-				$session_id = $this->get_random_key();
-				$_COOKIE[ $insecure_session_name ] = $session_id;
-			}
-		}
-
 	}
 
 	/**
@@ -162,7 +139,7 @@ class Pantheon_Sessions {
 
 		$table_name = "{$table_prefix}pantheon_sessions";
 		$wpdb->pantheon_sessions = $table_name;
-		$wpdb->tables[] = $table_name;
+		$wpdb->tables[] = 'pantheon_sessions';
 
 		if ( get_option( 'pantheon_session_version' ) ) {
 			return;
@@ -201,18 +178,6 @@ class Pantheon_Sessions {
 		}
 
 		return;
-	}
-
-
-	/**
-	 * Get a randomized key
-	 *
-	 * @return string
-	 */
-	public function get_random_key() {
-		require_once( ABSPATH . 'wp-includes/class-phpass.php');
-		$hasher = new PasswordHash( 8, false );
-		return md5( $hasher->get_random_bytes( 32 ) );
 	}
 
 }
