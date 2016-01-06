@@ -576,9 +576,10 @@ class GFSettings {
 					<?php
 					foreach ( $setting_tabs as $tab ) {
 						$name = $tab['label'];
+						$url  = add_query_arg( array( 'subview' => $tab['name'] ), admin_url( 'admin.php?page=gf_settings' ) );
 						?>
 						<li <?php echo urlencode( $current_tab ) == $tab['name'] ? "class='active'" : '' ?>>
-							<a href="<?php echo esc_url( add_query_arg( array( 'subview' => $tab['name'] ) ) ); ?>"><?php echo esc_html( $tab['label'] ) ?></a>
+							<a href="<?php echo esc_url( $url ); ?>"><?php echo esc_html( $tab['label'] ) ?></a>
 						</li>
 					<?php
 					}
