@@ -1,5 +1,5 @@
 <?php
-class Sections_Admin_Table extends WP_List_Table {
+class Sections_Admin_Table extends Tools_WP_List_Table {
 
    /**
     * Constructor, we override the parent to pass our own arguments

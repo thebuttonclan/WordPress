@@ -22,8 +22,8 @@ class PL_Pro_Sections_Admin {
       return $this->actions();
     }
 
-    if(!class_exists( 'WP_List_Table' ) ) {
-      require_once( ABSPATH . 'wp-admin/includes/class-wp-list-table.php' );
+    if(!class_exists( 'Tools_WP_List_Table' ) ) {
+      require_once( 'class-wp-list-table.php' );
     }
     include_once( 'class.sections.admin.table.php' );
     $updated = ( isset( $_GET['updated'] ) ) ? '<div class="updated fade">Section Deleted!</div>' : '';
