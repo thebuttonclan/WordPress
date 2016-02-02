@@ -181,7 +181,8 @@ class plRevSlider extends PageLinesSection {
 			
 			foreach( $array as $slide ){
 				
-				$the_bg = pl_array_get( 'background', $slide ); 
+				$the_bg = pl_array_get( 'background', $slide );
+				$the_bg_id = pl_get_image_id_from_src( $the_bg );
 				$extra = pl_array_get( 'extra', $slide ); 
 				$video_embed = false;// pl_array_get( 'video_embed', $slide ); 
 				 
@@ -221,8 +222,9 @@ class plRevSlider extends PageLinesSection {
 					}
 					
 					$the_bg = ( $the_bg ) ? $the_bg : $this->base_url.'/black-default-bg.png';
+					$bg_alt = get_post_meta( $the_bg_id, '_wp_attachment_image_alt', true );
 
-					$bg = sprintf('<img src="%s" alt="" data-bgposition="center center" data-bgfit="cover" data-bgrepeat="no-repeat">', $the_bg);
+					$bg = sprintf('<img src="%s" alt="%s" data-bgposition="center center" data-bgfit="cover" data-bgrepeat="no-repeat">', $the_bg, $bg_alt);
 					
 					$the_text = ( $the_text != '' ) ? sprintf('<small>%s</small>', $the_text) : '';
 

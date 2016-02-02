@@ -105,7 +105,8 @@ class PLQuickCarousel extends PageLinesSection {
 		if( is_array( $array ) ){
 			foreach( $array as $key => $item ){
 				$image = pl_array_get( 'image', $item );
-				$image_id = pl_array_get( 'image_attach_id', $item );
+				$image_id = pl_get_image_id_from_src( $image );
+
 				$link = pl_array_get( 'link', $item );
 
 				if( $image ){
@@ -113,8 +114,12 @@ class PLQuickCarousel extends PageLinesSection {
 					$image_meta = wp_get_attachment_image_src( $image_id, 'aspect-thumb' );
 
 					$image_url = (isset($image_meta[0])) ? $image_meta[0] : $image;
-
-					$image_out = ( $link ) ? sprintf('<a href="%s"><img src="%s" alt="" /></a>', $link, $image_url) : sprintf('<img src="%s" alt="" />', $image_url);
+					
+					$image_alt = get_post_meta( $image_id, '_wp_attachment_image_alt', true );
+					
+					
+					
+					$image_out = ( $link ) ? sprintf( '<a href="%s"><img src="%s" alt="%s" /></a>', $link, $image_url, $image_alt) : sprintf('<img src="%s" alt="%s" />', $image_url, $image_alt );
 
 					$out .= sprintf(
 						'<div class="%s carousel-item span%s" style=""><div class="carousel-item-pad %s %s">%s</div></div>',
