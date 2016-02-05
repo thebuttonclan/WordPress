@@ -101,10 +101,9 @@ class GFFormsModel {
 
 	public static function get_forms( $is_active = null, $sort_column = 'title', $sort_dir = 'ASC', $is_trash = false ) {
 		global $wpdb;
-		$form_table_name        = self::get_form_table_name();
-		$lead_table_name        = self::get_lead_table_name();
-		$lead_detail_table_name = self::get_lead_details_table_name();
-		$view_table_name        = self::get_form_view_table_name();
+		$form_table_name = self::get_form_table_name();
+		$lead_table_name = self::get_lead_table_name();
+		$view_table_name = self::get_form_view_table_name();
 
 		$where_arr   = array();
 		$where_arr[] = $wpdb->prepare( 'is_trash=%d', $is_trash );
@@ -132,7 +131,7 @@ class GFFormsModel {
 		$forms = $wpdb->get_results( $sql );
 
 		//Getting entry count per form
-		$sql         = "SELECT l.form_id, count(DISTINCT(l.id)) as lead_count FROM $lead_table_name l INNER JOIN $lead_detail_table_name ld ON l.id=ld.lead_id WHERE l.status='active' GROUP BY l.form_id";
+		$sql         = "SELECT form_id, count(id) as lead_count FROM $lead_table_name l WHERE status='active' GROUP BY form_id";
 		$entry_count = $wpdb->get_results( $sql );
 
 		//Getting view count per form
@@ -777,6 +776,8 @@ class GFFormsModel {
 		$lead_detail_long_table = self::get_lead_details_long_table_name();
 		$lead_meta_table 		= self::get_lead_meta_table_name();
 
+		GFCommon::log_debug( __METHOD__ . "(): Deleting entries for form #{$form_id}." );
+
 		/**
 		 * Fires when you delete entries for a specific form
 		 *
@@ -1259,13 +1260,22 @@ class GFFormsModel {
 		 *
 		 * @param int $form_id The form ID where the form was deleted
 		 * @param int $field_id The ID of the field that was deleted
+         *
 		 */
 		do_action( 'gform_after_delete_field', $form_id, $field_id );
 	}
 
-	public static function delete_lead( $lead_id ) {
+    public static function delete_lead( $lead_id ) {
 		global $wpdb;
 
+		GFCommon::log_debug( __METHOD__ . "(): Deleting entry #{$lead_id}." );
+
+
+        /**
+         * Fires before a lead is deleted
+         * @param $lead_id
+         * @deprecated Use gform_delete_entry instead
+         */
 		do_action( 'gform_delete_lead', $lead_id );
 
 		$lead_table             = self::get_lead_table_name();
@@ -2321,7 +2331,7 @@ class GFFormsModel {
 		$post_data['images']        = $images;
 
 		//setting current user as author depending on settings
-		$post_data['post_author'] = $form['useCurrentUserAsAuthor'] && ! empty( $lead['created_by'] ) ? $lead['created_by'] : $form['postAuthor'];
+		$post_data['post_author'] = $form['useCurrentUserAsAuthor'] && ! empty( $lead['created_by'] ) ? $lead['created_by'] : rgar( $form, 'postAuthor' );
 
 		return $post_data;
 	}
@@ -4806,7 +4816,7 @@ class GFFormsModel {
 			if ( 'contains' == $operator ) {
 				$operator = 'like';
 			}
-			$search_term = 'like' == $operator ? '%value%' : $value;
+			$search_term = 'like' == $operator ? "%$value%" : $value;
 			if ( 'date_created' == $key && '=' === $operator ) {
 				$where_array[] = $wpdb->prepare( '(datediff(date_created, %s) >= 0 AND datediff(date_created, %s) <= 0)', $search_term, $search_term );
 			} else if ( in_array( $key, $int_columns ) ) {

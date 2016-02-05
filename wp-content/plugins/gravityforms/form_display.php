@@ -130,6 +130,9 @@ class GFFormDisplay {
 				$confirmation = self::handle_submission( $form, $lead, $ajax );
 
 				//after submission hook
+				if ( has_filter( 'gform_after_submission' ) || has_filter( "gform_after_submission_{$form['id']}" ) ) {
+					GFCommon::log_debug( __METHOD__ . '(): Executing functions hooked to gform_after_submission.' );
+				}
 				gf_do_action( array( 'gform_after_submission', $form['id'] ), $lead, $form );
 
 			} elseif ( $saving_for_later ) {
@@ -839,6 +842,7 @@ class GFFormDisplay {
 			if ( $has_pages ) {
 				$style = self::is_page_active( $form_id, 1 ) ? '' : "style='display:none;'";
 				$class = ! empty( $form['firstPageCssClass'] ) ? " {$form['firstPageCssClass']}" : '';
+				$class = esc_attr( $class );
 				$form_string .= "<div id='gform_page_{$form_id}_1' class='gform_page{$class}' {$style}>
                                     <div class='gform_page_fields'>";
 			}
@@ -1306,7 +1310,7 @@ class GFFormDisplay {
 			$default_anchor = self::has_pages( $form ) ? 1 : 0;
 			$anchor         = gf_apply_filters( array( 'gform_confirmation_anchor', $form['id'] ), $default_anchor ) ? "<a id='gf_{$form['id']}' class='gform_anchor' ></a>" : '';
 			$nl2br          = rgar( $form['confirmation'], 'disableAutoformat' ) ? false : true;
-			$cssClass       = rgar( $form, 'cssClass' );
+			$cssClass       = esc_attr( rgar( $form, 'cssClass' ) );
 			$confirmation   = empty( $form['confirmation']['message'] ) ? "{$anchor} " : "{$anchor}<div id='gform_confirmation_wrapper_{$form['id']}' class='gform_confirmation_wrapper {$cssClass}'><div id='gform_confirmation_message_{$form['id']}' class='gform_confirmation_message_{$form['id']} gform_confirmation_message'>" . GFCommon::replace_variables( $form['confirmation']['message'], $form, $lead, false, true, $nl2br ) . '</div></div>';
 		} else {
 			if ( ! empty( $form['confirmation']['pageId'] ) ) {
@@ -1345,6 +1349,9 @@ class GFFormDisplay {
 			}
 		}
 
+		if ( has_filter( 'gform_confirmation' ) || has_filter( "gform_confirmation_{$form['id']}" ) ) {
+			GFCommon::log_debug( __METHOD__ . '(): Executing functions hooked to gform_confirmation.' );
+		}
 		$confirmation = gf_apply_filters( array( 'gform_confirmation', $form['id'] ), $confirmation, $form, $lead, $ajax );
 
 		if ( ! is_array( $confirmation ) ) {
@@ -2486,7 +2493,7 @@ class GFFormDisplay {
 		$is_entry_detail = GFCommon::is_entry_detail();
 		$is_admin = $is_form_editor || $is_entry_detail;
 
-		$custom_class = $is_admin ? '' : $field->cssClass;
+		$custom_class = $is_admin ? '' : esc_attr( $field->cssClass );
 
 		if ( $field->type == 'page' ) {
 			if ( $is_entry_detail ) {
