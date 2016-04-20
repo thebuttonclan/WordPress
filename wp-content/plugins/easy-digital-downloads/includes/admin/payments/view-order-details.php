@@ -70,6 +70,7 @@ $currency_code  = $payment->currency;
 										<?php do_action( 'edd_view_order_details_totals_before', $payment_id ); ?>
 
 										<div class="edd-admin-box-inside">
+											<p>
 												<span class="label"><?php _e( 'Status:', 'easy-digital-downloads' ); ?></span>&nbsp;
 												<select name="edd-payment-status" class="medium-text">
 													<?php foreach( edd_get_payment_statuses() as $key => $status ) : ?>
@@ -148,18 +149,29 @@ $currency_code  = $payment->currency;
 								<div class="edd-order-update-box edd-admin-box">
 									<?php do_action( 'edd_view_order_details_update_before', $payment_id ); ?>
 									<div id="major-publishing-actions">
-										<div id="publishing-action">
-											<input type="submit" class="button button-primary right" value="<?php esc_attr_e( 'Save Payment', 'easy-digital-downloads' ); ?>"/>
-											<?php if( edd_is_payment_complete( $payment_id ) ) : ?>
-												<a href="<?php echo add_query_arg( array( 'edd-action' => 'email_links', 'purchase_id' => $payment_id ) ); ?>" id="edd-resend-receipt" class="button-secondary right"><?php _e( 'Resend Receipt', 'easy-digital-downloads' ); ?></a>
-											<?php endif; ?>
+										<div id="delete-action">
+											<a href="<?php echo wp_nonce_url( add_query_arg( array( 'edd-action' => 'delete_payment', 'purchase_id' => $payment_id ), admin_url( 'edit.php?post_type=download&page=edd-payment-history' ) ), 'edd_payment_nonce' ) ?>" class="edd-delete-payment edd-delete"><?php _e( 'Delete Payment', 'easy-digital-downloads' ); ?></a>
 										</div>
+										<input type="submit" class="button button-primary right" value="<?php esc_attr_e( 'Save Payment', 'easy-digital-downloads' ); ?>"/>
 										<div class="clear"></div>
 									</div>
 									<?php do_action( 'edd_view_order_details_update_after', $payment_id ); ?>
 								</div><!-- /.edd-order-update-box -->
 
 							</div><!-- /#edd-order-data -->
+
+							<div id="edd-order-resend-receipt" class="postbox edd-order-data">
+								<div class="inside">
+									<div class="edd-order-resend-receipt-box edd-admin-box">
+									<?php do_action( 'edd_view_order_details_resend_receipt_before', $payment_id ); ?>
+										<?php if( edd_is_payment_complete( $payment_id ) ) : ?>
+											<a href="<?php echo add_query_arg( array( 'edd-action' => 'email_links', 'purchase_id' => $payment_id ) ); ?>" id="edd-resend-receipt" class="button-secondary alignleft"><?php _e( 'Resend Receipt', 'easy-digital-downloads' ); ?></a>
+										<?php endif; ?>
+										<div class="clear"></div>
+										<?php do_action( 'edd_view_order_details_resend_receipt_after', $payment_id ); ?>
+									</div><!-- /.edd-order-resend-receipt-box -->
+								</div>
+							</div>
 
 							<div id="edd-order-details" class="postbox edd-order-data">
 
@@ -274,6 +286,7 @@ $currency_code  = $payment->currency;
 									<div class="row">
 										<ul>
 											<?php
+
 											// Item ID is checked if isset due to the near-1.0 cart data
 											$item_id    = isset( $cart_item['id']    )                                  ? $cart_item['id']                                 : $cart_item;
 											$price      = isset( $cart_item['price'] )                                  ? $cart_item['price']                              : false;
@@ -296,7 +309,7 @@ $currency_code  = $payment->currency;
 														if ( isset( $cart_items[ $key ]['item_number'] ) && isset( $cart_items[ $key ]['item_number']['options'] ) ) {
 															$price_options = $cart_items[ $key ]['item_number']['options'];
 
-															if ( isset( $price_id ) ) {
+															if ( edd_has_variable_prices( $item_id ) && isset( $price_id ) ) {
 																echo ' - ' . edd_get_price_option_name( $item_id, $price_id, $payment_id );
 															}
 														}
@@ -305,6 +318,7 @@ $currency_code  = $payment->currency;
 												</span>
 												<input type="hidden" name="edd-payment-details-downloads[<?php echo $key; ?>][id]" class="edd-payment-details-download-id" value="<?php echo esc_attr( $item_id ); ?>"/>
 												<input type="hidden" name="edd-payment-details-downloads[<?php echo $key; ?>][price_id]" class="edd-payment-details-download-price-id" value="<?php echo esc_attr( $price_id ); ?>"/>
+												<input type="hidden" name="edd-payment-details-downloads[<?php echo $key; ?>][item_price]" class="edd-payment-details-download-item-price" value="<?php echo esc_attr( $item_price ); ?>"/>
 												<input type="hidden" name="edd-payment-details-downloads[<?php echo $key; ?>][amount]" class="edd-payment-details-download-amount" value="<?php echo esc_attr( $price ); ?>"/>
 												<input type="hidden" name="edd-payment-details-downloads[<?php echo $key; ?>][quantity]" class="edd-payment-details-download-quantity" value="<?php echo esc_attr( $quantity ); ?>"/>
 
