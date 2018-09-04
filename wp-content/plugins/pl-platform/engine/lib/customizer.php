@@ -8,61 +8,59 @@
  * @category  Class
  * @author    PageLines
  */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 class PL_Platform_WP_Customizer{
-  
-  function __construct(){
+
+  function __construct() {
 
     add_action( 'customize_register', array( $this, 'customizer_load' ), 11 );
-  
+
   }
 
-  
 
-  function customizer_load( $wp_customize ){
+
+  function customizer_load( $wp_customize ) {
 
     pl_add_customizer_classes();
-   
+
     // if ( $wp_customize->is_preview() && ! is_admin() ) {
     //   add_action( 'wp_footer', array( $this, 'customize_preview' ), 21 );
     // }
 
-
     $wp_customize->get_setting( 'blogname' )->transport        = 'postMessage';
     $wp_customize->get_setting( 'blogdescription' )->transport = 'postMessage';
 
-    $config = apply_filters('pl_platform_customizer_config', array()); 
+    $config = apply_filters( 'pl_platform_customizer_config', array() );
 
     /**
      * register the sections
      */
-    
-    if( is_array( $config ) && ! empty( $config ) ){
 
-      foreach( $config as $id => $section ) {
+    if ( is_array( $config ) && ! empty( $config ) ) {
+
+      foreach ( $config as $id => $section ) {
 
         /** Dont show in customizer if not meant for it... */
-        if( ! $this->check_location( $section ) )
-          continue;
-        
+        if ( ! $this->check_location( $section ) ) {
+          continue; }
 
-        $priority = ( isset($section['priority']) ) ? $section['priority'] : 20;
+        $priority = ( isset( $section['priority'] ) ) ? $section['priority'] : 20;
 
         $section_config = array(
-            'title'     => strip_tags( $section['title'] ), 
-            'priority'  => $priority
-          ); 
+            'title'     => strip_tags( $section['title'] ),
+            'priority'  => $priority,
+          );
 
-        $key = ( isset($section['key']) ) ? $section['key'] : pl_ui_key( $section['title'] );
-         
+        $key = ( isset( $section['key'] ) ) ? $section['key'] : pl_ui_key( $section['title'] );
+
         $wp_customize->add_section( $section['key'], $section_config );
 
-        foreach($section['opts'] as $i => $o ){
+        foreach ( $section['opts'] as $i => $o ) {
 
           /** Dont show in customizer if not meant for it... */
-          if( ! $this->check_location( $o ) )
-            continue;
+          if ( ! $this->check_location( $o ) ) {
+            continue; }
 
           $o['section'] = $section['key'];
 
@@ -70,125 +68,111 @@ class PL_Platform_WP_Customizer{
 
           $handling = ( isset( $o['handling'] ) ) ? $o['handling'] : array();
 
-          $handling= wp_parse_args( $handling, array(
-            'default'         => '',
-            'type'            => 'option',
-            'capability'      => 'edit_theme_options'
+          $handling = wp_parse_args( $handling, array(
+              'default'         => '',
+              'type'            => 'option',
+              'capability'      => 'edit_theme_options',
           ));
 
           $wp_customize->add_setting( $this->prepare_option( $o['key'] ), $handling );
 
-          if( isset( $o['class'] ) ) {
+          if ( isset( $o['class'] ) ) {
 
             $set = $o;
 
-            unset($set['type']);
+            unset( $set['type'] );
 
             $wp_customize->add_control( new $o['class']( $wp_customize, $o['key'], $set ) );
-          }  
-
-          else {
+          } else {
             $wp_customize->add_control( $this->prepare_option( $o['key'] ), $o );
           }
         }
       }
-    } 
+    }
   }
 
-  function check_location( $array ){
+  function check_location( $array ) {
 
-    $location = ( isset($array['location']) ) ? $array['location'] : array();
+    $location = ( isset( $array['location'] ) ) ? $array['location'] : array();
+
+    // do not show in customizer if no permissions
+    if ( isset( $array['priv'] ) && ! pl_is_professional() ) {
+      return false;
+    }
 
     /** Dont show in customizer if not meant for it... */
-    if( ! empty( $location ) && ! in_array( 'customizer', $location ) )
+    if ( ! empty( $location ) && ! in_array( 'customizer', $location ) ) {
       return false;
-
-    else
+    } else {
       return true;
+    }
 
   }
 
-  function customizer_engine( $o, $section ){
+  function customizer_engine( $o, $section ) {
 
-
-    if( isset($o['place']) && ! isset( $o['placeholder'] ) ){
+    if ( isset( $o['place'] ) && ! isset( $o['placeholder'] ) ) {
       $o['placeholder'] = $o['place'];
     }
 
-    if( isset($o['help']) && ! isset( $o['description'] ) ){
+    if ( isset( $o['help'] ) && ! isset( $o['description'] ) ) {
       $o['description'] = $o['help'];
     }
-    
+
     $o = wp_parse_args( $o, array(
-        'placeholder' => '', 
-        'description' => '', 
+        'placeholder' => '',
+        'description' => '',
         'section'     => $section['key'],
-        'settings'    => $this->prepare_option( $o['key'] ), 
-        'label'       => ( isset( $o['title'] ) ) ? $o['title'] : ''
-      ));
+        'settings'    => $this->prepare_option( $o['key'] ),
+        'label'       => ( isset( $o['title'] ) ) ? $o['title'] : '',
+    ));
 
+    if ( 'image_upload' == $o['type'] ) {
+      $o['class'] = 'WP_Customize_Image_Control'; } elseif ( 'color' == $o['type'] ) {
+      $o['class'] = 'WP_Customize_Color_Control'; } elseif ( 'select_menu' == $o['type'] ) {
+        $o['class'] = 'PL_Menu_Dropdown_Custom_Control'; } elseif ( 'script' == $o['type'] ) {
+        $o['class'] = 'PL_Script_Custom_Control'; } elseif (
+        'select' == $o['type']
+        || 'radio' == $o['type']
+        || 'select_imagesizes' == $o['type']
+        ) {
 
-    if( 'image_upload' == $o['type'] )
-      $o['class'] = 'WP_Customize_Image_Control';
+          $o['choices'] = array( '' => 'Default' );
 
-    elseif( 'color' == $o['type'] )
-      $o['class'] = 'WP_Customize_Color_Control';
+          if ( 'select_imagesizes' == $o['type'] ) {
+            $items = get_intermediate_image_sizes();
 
-    elseif( 'select_menu' == $o['type'] )
-      $o['class'] = 'PL_Menu_Dropdown_Custom_Control';
+            if ( is_array( $items ) ) {
+              foreach ( $items as $m ) {
+                $o['opts'][ $m ] = array( 'name' => $m );
+              }
+            }
 
-    elseif( 'script' == $o['type'] )
-      $o['class'] = 'PL_Script_Custom_Control';
+            $o['type'] = 'select';
+          }
 
-    elseif( 
-      'select' == $o['type'] 
-      || 'radio' == $o['type'] 
-      || 'select_imagesizes' == $o['type'] 
-    ){
+          foreach ( $o['opts'] as $key => $c ) {
+            $o['choices'][ $key ] = $c['name'];
+          }
+        } elseif ( 'count_select' == $o['type'] ) {
 
-      $o['choices'] = array( '' => 'Default' );
+          $o['type'] = 'select';
 
-      if( 'select_imagesizes' == $o['type'] ){
-        $items = get_intermediate_image_sizes();
+          $count_start = (isset( $o['count_start'] )) ? $o['count_start'] : 0;
 
-        if( is_array( $items ) ){
-          foreach( $items as $m ){
-            $o['opts'][ $m ] = array( 'name' => $m );
+          $suffix = (isset( $o['suffix'] )) ? $o['suffix'] : '';
+
+          for ( $i = $count_start; $i <= $o['count_number']; $i++ ) {
+            $o['choices'][ $i ] = $i . $suffix;
+          }
+        } elseif ( 'range' == $o['type'] ) {
+
+          foreach ( $o['opts'] as $key => $c ) {
+            $o['input_attrs'][ $key ] = $c;
           }
         }
 
-        $o['type'] = 'select';
-      }
-        
-
-      foreach( $o['opts'] as $key => $c ){
-        $o['choices'][$key] = $c['name'];
-      }
-      
-    }
-    elseif( 'select_count' == $o['type'] ){
-
-      $o['type'] = 'select';
-
-      $count_start = (isset($o['count_start'])) ? $o['count_start'] : 0;
-
-      $suffix = (isset($o['suffix'])) ? $o['suffix'] : '';
-
-      for($i = $count_start; $i <= $o['count_number']; $i++){
-        $o['choices'][ $i ] = $i . $suffix;
-      }
-      
-    }
-
-    elseif( 'range' == $o['type'] ){
-
-      foreach( $o['opts'] as $key => $c ){
-        $o['input_attrs'][$key] = $c;
-      }
-      
-    }
-    
-    return $o; 
+        return $o;
 
   }
 
@@ -200,12 +184,11 @@ class PL_Platform_WP_Customizer{
 
     return sprintf( '%s[%s]', pl_base_settings_slug(), $opt );
   }
-
 }
 
 
 
-function pl_add_customizer_classes(){
+function pl_add_customizer_classes() {
 
   /**
    * Class to create a custom menu control
@@ -214,7 +197,7 @@ function pl_add_customizer_classes(){
     private $menus = false;
 
     public function __construct( $manager, $id, $args = array(), $options = array() ) {
-        $this->menus = wp_get_nav_menus($options);
+        $this->menus = wp_get_nav_menus( $options );
         parent::__construct( $manager, $id, $args );
     }
 
@@ -222,23 +205,23 @@ function pl_add_customizer_classes(){
      * Render the content on the theme customizer page
     */
     public function render_content() {
-        if( ! empty( $this->menus ) ) {
-            ?>
+      if ( ! empty( $this->menus ) ) {
+        ?>
         <label>
-          <span class="customize-control-title"><?php echo esc_html( $this->label ); ?></span>
-          <?php if( $this->description ) : ?>
-            <span class="description customize-control-description"><?php echo $this->description; ?></span>
+        <span class="customize-control-title"><?php echo esc_html( $this->label ); ?></span>
+          <?php if ( $this->description ) : ?>
+            <span class="pl-description customize-control-description"><?php echo $this->description; ?></span>
           <?php endif; ?>
-            <select name="<?php echo $this->id; ?>" id="<?php echo $this->id; ?>">
-            <?php
-                foreach ( $this->menus as $menu ) {
-                    printf('<option value="%s" %s>%s</option>', $menu->term_id, selected($this->value(), $menu->term_id, false), $menu->name);
-                }
+          <select name="<?php echo $this->id; ?>" id="<?php echo $this->id; ?>">
+          <?php
+          foreach ( $this->menus as $menu ) {
+            printf( '<option value="%s" %s>%s</option>', $menu->term_id, selected( $this->value(), $menu->term_id, false ), $menu->name );
+          }
             ?>
             </select>
         </label>
 <?php
-        }
+      }
     }
   }
 
@@ -254,20 +237,19 @@ function pl_add_customizer_classes(){
         parent::__construct( $manager, $id, $args );
     }
 
-
-
     /**
      * Add a second textarea to treat codemirror and wp.customize separetely
      * CM freaks out if we dynamically set the textarea value, and the customizer wont update if we dont
     */
-    public function render_content() { ?>
+    public function render_content() {
+  ?>
     <span class="customize-control-title"><?php echo esc_html( $this->label ); ?></span>
     <textarea class="html-textarea code_textarea pl-code-editor large-text" placeholder="<?php echo $this->args['placeholder'];?>" data-mode="<?php echo $this->args['mode'];?>"><?php echo esc_textarea( $this->value() ); ?></textarea>
     
     <textarea class="the-value" type="text" style="display: none;" <?php $this->link(); ?>></textarea>
 
 <?php
-   
+
     }
   }
 }

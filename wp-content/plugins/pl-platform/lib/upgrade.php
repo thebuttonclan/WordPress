@@ -10,23 +10,27 @@
  * @category  Class
  * @author    PageLines
  */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 class PL_Platform_Upgrader {
-  
+
   function __construct() {
     add_action( 'admin_init', array( $this, 'oauth_data_update' ) );
   }
-  
+
   function oauth_data_update() {
-    
+
     // do we run?
-    if( ! get_option( '_pl_oauth_data' ) ) {
+    if ( ! get_option( '_pl_oauth_data' ) ) {
       $data = get_user_meta( wp_get_current_user()->ID, '_pl_oauth_data', true );
-      if( $data ) {
+      if ( $data ) {
         update_option( '_pl_oauth_data', $data );
         delete_user_meta( wp_get_current_user()->ID, '_pl_oauth_data' );
       }
+    }
+    if ( ! get_option( '_pl_oauthed_user' ) ) {
+      $current_user = wp_get_current_user();
+      update_option( '_pl_oauthed_user', $current_user->user_login );
     }
   }
 }

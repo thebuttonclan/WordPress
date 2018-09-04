@@ -10,8 +10,8 @@
  * @category  Class
  * @author    PageLines
  */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 class PL_Section_Register {
 
   /** @var string The slug in the option DB associated with sections data. */
@@ -31,20 +31,20 @@ class PL_Section_Register {
 
   function __construct() {
 
-      add_action( 'pl_reset_sections',           array($this, 'reset_sections' ));
-      add_action( 'activate_plugin',             array($this, 'reset_sections' ));
-      add_action( 'deactivate_plugin',           array($this, 'reset_sections' ));
-      add_action( 'upgrader_process_complete',   array($this, 'reset_sections' ));
-      add_action( 'after_switch_theme',          array($this, 'reset_sections' ));
+      add_action( 'pl_reset_sections',           array( $this, 'reset_sections' ) );
+      add_action( 'activate_plugin',             array( $this, 'reset_sections' ) );
+      add_action( 'deactivate_plugin',           array( $this, 'reset_sections' ) );
+      add_action( 'upgrader_process_complete',   array( $this, 'reset_sections' ) );
+      add_action( 'after_switch_theme',          array( $this, 'reset_sections' ) );
   }
 
 
-  function default_headers(){
+  function default_headers() {
     $a = array(
       'name'            => '',                          // Name of the extension
       'pagelines'       => '',                          // Class name if section or true if just a regular plugin
       'author'          => 'PageLines',                 // Author name
-      'author_uri'      => 'http://www.pagelines.com/', // URL for author
+      'author_uri'      => 'https://www.pagelines.com/', // URL for author
       'description'     => 'No description',            // Description of the extension
       'plugin_name'     => '',                          // Plugin name (if plugin)
       'tags'            => '',                          // Extension tags for filtering
@@ -58,8 +58,9 @@ class PL_Section_Register {
       'docs'            => false,                       // Documentation URL
       'loading'         => 'active',                    // How to handle the initial loading of the section (refresh, active)
       'icon'            => '',                          // Path to the section icon
-      'section'         => '', 
-      'contain'         => ''                           // Can contain other sections
+      'section'         => '',
+      'contain'         => '',                          // Can contain other sections
+      'reqver'          => '',                          // Requires at least ( PL version )
     );
 
     return $a;
@@ -75,28 +76,31 @@ class PL_Section_Register {
   function get_sections( $type = false, $reregister = false ) {
 
     /** Check if this has been done already on this page load... */
-    if( is_array( $this->sections_data ) && ! empty( $this->sections_data ) ) {
+    if ( is_array( $this->sections_data ) && ! empty( $this->sections_data ) ) {
 
       $data = $this->sections_data;
 
-
-    }
-
-
-    else {
+    } else {
 
       /** Allow for reregister via plreg variable in URL */
       $reregister = ( isset( $_GET['plreg'] ) || $reregister ) ? true : false;
+
+      
+      /** if base URL changed for some reason (site moved, etc..) */
+      if( get_option('pl_base_url', get_template_directory_uri() ) != get_template_directory_uri()  ){
+  
+        $reregister = true;
+      }
 
       /** Get whatever is in the DB for sections now. */
       $data = get_theme_mod( $this->slug );
 
       /**  if no data is stored, it was either reset or never created */
-      if( ! is_array( $data ) || empty( $data ) || $reregister ) {
+      if ( ! is_array( $data ) || empty( $data ) || $reregister ) {
+
+        update_option('pl_base_url', get_template_directory_uri()); 
 
         $data = $this->save_sections( $this->generate_data() );
-
-
 
       }
 
@@ -105,7 +109,7 @@ class PL_Section_Register {
     }
 
     /** by now we are sure to have an array even if its empty */
-    return ( $type && isset( $data[$type]) ) ? $data[$type] : $data;
+    return ( $type && isset( $data[ $type ] ) ) ? $data[ $type ] : $data;
 
   }
 
@@ -125,15 +129,13 @@ class PL_Section_Register {
     $sections['plugins'] = $this->get_all_plugins();
 
     /** Get raw sections data using the folders */
-    foreach ( $section_dirs as $type => $d ){
+    foreach ( $section_dirs as $type => $d ) {
 
-
-      if( is_dir( $d['dir'] ) ){
+      if ( is_dir( $d['dir'] ) ) {
 
         $sections[ $type ] = $this->get_sections_data( $d['dir'], $d['url'] );
 
       }
-
     }
 
     return $sections;
@@ -142,7 +144,7 @@ class PL_Section_Register {
   /**
    * Set data for section
    */
-  function set_data( $data ){
+  function set_data( $data ) {
 
     $a = $this->default_headers();
 
@@ -153,32 +155,31 @@ class PL_Section_Register {
     return $d;
   }
 
-  function set_default_wp_headers(){
+  function set_default_wp_headers() {
 
     $a = $this->default_headers();
 
     $headers = array();
 
-    foreach( $a as $key => $name ){
+    foreach ( $a as $key => $name ) {
 
-      if( $key == 'author_uri' )
+      if ( 'author_uri' == $key ) {
         $headers[ $key ] = 'Author URI';
-      else
-        $headers[ $key ] = ucwords( str_replace('_', ' ', $key) );
-
+      } else {
+        $headers[ $key ] = ucwords( str_replace( '_', ' ', $key ) );
+      }
     }
 
     return $headers;
   }
-  
+
   /**
    * Get section data form PHP files.
    */
   function get_sections_data( $dir, $url ) {
 
-
-    if ( ! is_dir( $dir ) )
-      return;
+    if ( ! is_dir( $dir ) ) {
+      return; }
 
     /** WordPress requires that you tell it what headers you want */
     $default_headers = $this->set_default_wp_headers();
@@ -189,81 +190,70 @@ class PL_Section_Register {
     // symlinks were only supported after 5.3.1
     // so we need to check first ;)
     $it = ( strnatcmp( phpversion(), '5.3.1' ) >= 0 )
-      ? new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $dir, FilesystemIterator::FOLLOW_SYMLINKS    ) , RecursiveIteratorIterator::SELF_FIRST )
-      : new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $dir, RecursiveIteratorIterator::CHILD_FIRST  )
-    );
+      ? new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $dir, FilesystemIterator::FOLLOW_SYMLINKS ) , RecursiveIteratorIterator::SELF_FIRST )
+      : new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $dir, RecursiveIteratorIterator::CHILD_FIRST )
+      );
 
-    foreach ( $it as $fullFileName => $fileSPLObject ) {
-
+    foreach ( $it as $fullfilename => $filesplobject ) {
 
       /** If not a PHP file continue */
-      if ( 'php' != pathinfo( $fullFileName, PATHINFO_EXTENSION ) )
-        continue;
+      if ( 'php' != pathinfo( $fullfilename, PATHINFO_EXTENSION ) ) {
+        continue; }
 
       /** Get header information from file in array */
-      $headers  = get_file_data( $fullFileName, $default_headers );
+      $headers  = get_file_data( $fullfilename, $default_headers );
 
       $headers = $this->unset_empty_values( $headers );
 
       // If there is a class_name header, then its a section
-      if ( ! isset( $headers['pagelines'] ) )
-        continue;
+      if ( ! isset( $headers['pagelines'] ) ) {
+        continue; }
 
       /** Get the Folder name for the section */
-      preg_match( '#[\/|\-]sections[\/|\\\]([^\/|\\\]+)#', $fullFileName, $out );
+      preg_match( '#[\/|\-]sections[\/|\\\]([^\/|\\\]+)#', $fullfilename, $out );
 
       $folder = sprintf( '/%s', $out[1] );
 
-
-      $headers['id'] = str_replace('/', '', $folder);
-
+      $headers['id'] = str_replace( '/', '', $folder );
 
       // base values
 
       $base_dir = $dir . $folder;
       $base_url = $url . $folder;
 
-
       // $filters = ( isset( $headers['filter'] ) ) ? explode( ',', $headers['filter'] ) : array();
 
       // $filters = implode( $filters, ',' );
 
-      $name = ( isset( $headers['plugin_name'] ) && $headers['plugin_name'] != '' ) ? $headers['plugin_name'] : $headers['section'];
+      $name = ( isset( $headers['plugin_name'] ) && '' != $headers['plugin_name'] ) ? $headers['plugin_name'] : $headers['section'];
 
       /** Remove standard prefix from name */
       $name = str_replace( $this->name_prefix, '', $name );
 
       $name = str_replace( 'Section', '', $name );
 
-
       $new = array(
         'name'        => $name,
         'base_url'    => $base_url,
         'base_dir'    => $base_dir,
-        'base_file'    => $fullFileName
+        'base_file'    => $fullfilename,
       );
-
 
       $headers = wp_parse_args( $new, $headers );
 
       $objects = $this->headers_get_objects( $headers );
 
+      if ( is_array( $objects ) ) {
+        foreach ( $objects as $obj ) {
 
+          $headers['class'] = $obj;
 
-      if( is_array( $objects ) ){
-          foreach( $objects as $obj ){
-
-            $headers['class'] = $obj;
-
-            $sections[ $obj ] = $this->set_data( $headers );
-          }
+          $sections[ $obj ] = $this->set_data( $headers );
+        }
       }
-
-
     }
 
     return $sections;
-
 
   }
 
@@ -271,12 +261,12 @@ class PL_Section_Register {
    * WP gets information and sets empty strings for headers that aren't set.
    * Lets unset all that so we can use wp_parse_args effectively to set better defaults
    */
-  function unset_empty_values( $raw ){
+  function unset_empty_values( $raw ) {
 
     $clean = array();
 
-    foreach( $raw as $key => $value){
-      if( $value !== '' ){
+    foreach ( $raw as $key => $value ) {
+      if ( '' !== $value ) {
         $clean[ $key ] = $value;
       }
     }
@@ -311,20 +301,22 @@ class PL_Section_Register {
    */
   function get_section_dirs() {
 
+    
+
     // TODO remove duplicated directories
 
     $this->section_dirs = array(
       'parent'  => array(
         'dir' => get_template_directory() . $this->sections_folder,
-        'url'  => get_template_directory_uri() . $this->sections_folder
+        'url'  => get_template_directory_uri() . $this->sections_folder,
       ),
       'custom'  => array(
         'dir' => get_stylesheet_directory() . $this->sections_folder,
-        'url'  => get_stylesheet_directory_uri() . $this->sections_folder
-      )
+        'url'  => get_stylesheet_directory_uri() . $this->sections_folder,
+      ),
     );
 
-    if( get_stylesheet_directory() == get_template_directory() ){
+    if ( get_stylesheet_directory() == get_template_directory() ) {
       unset( $this->section_dirs['custom'] );
     }
 
@@ -334,7 +326,7 @@ class PL_Section_Register {
   /**
    * Uses the SectionFactory class to instantiate all section classes and add to factory
    */
-  function register_sections( ) {
+  function register_sections() {
 
     $factory_register = new PL_Section_Factory();
 
@@ -345,24 +337,19 @@ class PL_Section_Register {
 
       foreach ( $sections as $s ) {
 
-
         /** Don't double load files if they have multiple sections included */
-        if( ! isset($included_files[ $s['base_file'] ]) && ! class_exists( $s['class'] ) && is_file( $s['base_file'] ) ) {
+        if ( ! isset( $included_files[ $s['base_file'] ] ) && ! class_exists( $s['class'] ) && is_file( $s['base_file'] ) ) {
 
           $included_files[ $s['base_file'] ] = true;
 
-          include( $s['base_file'] );
+          include_once( $s['base_file'] );
 
         }
 
-
-        if( class_exists( $s['class'] ) ){
+        if ( class_exists( $s['class'] ) ) {
           $factory_register->register( $s['class'], $s );
         }
-
       }
-
-
     }
 
     return $factory_register;
@@ -381,27 +368,25 @@ class PL_Section_Register {
 
     $pl_plugins = array();
 
+    foreach ( $installed_plugins as $path => $plugin ) {
 
-
-    foreach( $installed_plugins as $path => $plugin ) {
-
-      if ( ! is_plugin_active( $path ) )
-        continue;
+      if ( ! is_plugin_active( $path ) ) {
+        continue; }
 
       $fullpath = sprintf( '%s%s', trailingslashit( WP_PLUGIN_DIR ), $path );
 
       $headers = get_file_data( $fullpath, $default_headers );
 
-      if( empty( $headers['pagelines'] )
+      if ( empty( $headers['pagelines'] )
           || 'true' == $headers['pagelines']
+          || 'True' == $headers['pagelines']
           || 'internal' == $headers['pagelines']
-          || 'plugin' == $headers['pagelines'] ) {
+          || 'plugin' == $headers['pagelines']
+          ) {
 
-        unset( $installed_plugins[$path] );
+        unset( $installed_plugins[ $path ] );
 
-      }
-
-      else {
+      } else {
 
         $headers['base_dir']   = dirname( $fullpath );
         $headers['base_url']   = untrailingslashit( plugins_url( '', $path ) );
@@ -418,17 +403,15 @@ class PL_Section_Register {
 
         $objects = $this->headers_get_objects( $headers );
 
-        if( is_array( $objects ) ){
-            foreach( $objects as $obj ){
+        if ( is_array( $objects ) ) {
+          foreach ( $objects as $obj ) {
 
-              $headers['class'] = $obj;
+            $headers['class'] = $obj;
 
-              $pl_plugins[ $obj ] = $this->set_data( $headers );
-            }
+            $pl_plugins[ $obj ] = $this->set_data( $headers );
+          }
         }
-
       }
-
     }
 
     return $pl_plugins;
@@ -439,26 +422,16 @@ class PL_Section_Register {
    */
   function headers_get_objects( $headers ) {
 
-
-    if( isset( $headers['pagelines'] ) && 'true' != $headers['pagelines'] ) {
+    if ( isset( $headers['pagelines'] ) && 'true' != $headers['pagelines'] ) {
       $class = $headers['pagelines'];
-    }
-
-
-    /** Old way of doing this. */
-    elseif( isset( $headers['class_name'] ) ) {
+    } /** Old way of doing this. */
+    elseif ( isset( $headers['class_name'] ) ) {
       $class = $headers['class_name'];
-    }
+    } /** Plugin in a sections folder. Should be included but not called. */
+    elseif ( strpos( $headers['base_dir'], 'sections' ) !== false ) {
+      $class = $headers['id']; } else {       $class = false; }
 
-    /** Plugin in a sections folder. Should be included but not called. */
-    elseif( strpos( $headers['base_dir'], 'sections' ) !== false )
-      $class = $headers['id'];
-
-    else
-      $class = false;
-
-
-    return explode(',', str_replace( ' ', '', $class));
+    return explode( ',', str_replace( ' ', '', $class ) );
 
   }
 }

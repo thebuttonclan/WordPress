@@ -8,17 +8,17 @@
  * @category  Class
  * @author    PageLines
  */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 class PL_Map_Data{
 
-  private $table_slug = "pl_data_maps";
+  private $table_slug = 'pl_data_maps';
 
-  private $version_slug = "pl_maps_table_version";
+  private $version_slug = 'pl_maps_table_version';
 
-  private $version = 1.14;
+  private $version = 1.15;
 
-  function __construct(){
+  function __construct() {
 
     global $wpdb;
     $this->wpdb = $wpdb;
@@ -28,22 +28,22 @@ class PL_Map_Data{
     $this->installed_db_version = get_option( $this->version_slug );
 
     // Container for any settings added dynamically
-    $this->map_settings = array(); 
-
+    $this->map_settings = array();
 
     // check if install needed, if so, run install routine
-    if( $this->installed_db_version != $this->version ){
+    if ( $this->installed_db_version != $this->version ) {
       $this->install_table();
     }
 
     $this->map = $this->get_map_data();
 
     /** Any settings added via map can be added to data after its pulled from DB */
-    add_filter( 'pl_section_data', array( $this, 'add_template_data') );
+    add_filter( 'pl_section_data', array( $this, 'add_template_data' ) );
   }
 
-  function install_table(){
+  function install_table() {
 
+    global $wpdb;
     $sql = "CREATE TABLE $this->table_name (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
             uid VARCHAR(50) NOT NULL,
@@ -53,25 +53,24 @@ class PL_Map_Data{
           );";
 
     require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
-    
+
     dbDelta( $sql );
 
     update_option( $this->version_slug, $this->version );
+
   }
 
-  function save_map( $map, $editslug ){
+  function save_map( $map, $editslug ) {
 
     $result = '';
 
-    if( is_array( $map ) ){
+    if ( is_array( $map ) ) {
 
-      foreach( $map as $region => $m ){
+      foreach ( $map as $region => $m ) {
 
-        if( 'template' == $region  ){
+        if ( 'template' == $region  ) {
           $uid = $editslug;
-        }
-
-        else {
+        } else {
           $uid = $region;
         }
 
@@ -80,38 +79,34 @@ class PL_Map_Data{
         $result .= '_' . $uid;
 
       }
-
     }
 
     return $result;
   }
 
-  function update_or_insert( $uid, $data ){
+  function update_or_insert( $uid, $data ) {
 
-    $data = json_encode( $data );
-
+    $data = wp_json_encode( $data );
 
     $query = $this->wpdb->prepare( "INSERT INTO $this->table_name (uid, live)
                                     VALUES ( %s, %s)
                                     ON DUPLICATE KEY UPDATE
                                     live = VALUES(live)", $uid, $data);
 
-
     $result = $this->wpdb->query( $query );
 
     return $result;
   }
 
-  function get_map_data( ){
+  function get_map_data() {
 
     $uids = array();
 
-    foreach( pl_site_regions() as $r ){
+    foreach ( pl_site_regions() as $r ) {
 
-      if( 'template' == $r ){
+      if ( 'template' == $r ) {
         $uids[ $r ] = pl_edit_slug();
-      }
-      else {
+      } else {
         $uids[ $r ] = $r;
       }
     }
@@ -119,9 +114,9 @@ class PL_Map_Data{
     return $this->get_data( $uids );
   }
 
-  function get_data( $uids ){
+  function get_data( $uids ) {
 
-    $imploded_uids = join("','", $uids);
+    $imploded_uids = join( "','", $uids );
 
     $query = sprintf("SELECT uid, live
                       FROM $this->table_name
@@ -132,20 +127,18 @@ class PL_Map_Data{
 
     $config = $this->configure_data( $uids, $rows );
 
-
     return $config;
   }
 
-  function configure_data( $uids, $rows ){
+  function configure_data( $uids, $rows ) {
 
     $map_data = array();
 
+    foreach ( $uids as $region => $uid ) {
 
-    foreach( $uids as $region => $uid ){
+      foreach ( $rows as $m ) {
 
-      foreach( $rows as $m ){
-
-        if( $m->uid == $uid ){
+        if ( $m->uid == $uid ) {
 
           $map_data[ $region ] = pl_unserialize_or_decode( $m->live );
 
@@ -153,13 +146,12 @@ class PL_Map_Data{
       }
     }
 
-
     /** Properly ordered map */
     $map_for_output = array();
 
-    foreach( pl_site_regions() as $region ){
+    foreach ( pl_site_regions() as $region ) {
 
-      if( ! isset( $map_data[ $region ] ) ){
+      if ( ! isset( $map_data[ $region ] ) ) {
 
         $map_data[ $region ] = $this->default_region( $region );
 
@@ -168,7 +160,7 @@ class PL_Map_Data{
     }
 
     /** UPGRADE DATA */
-    $map_for_output = apply_filters('pl_map_raw', $map_for_output );
+    $map_for_output = apply_filters( 'pl_map_raw', $map_for_output );
 
     /** Add new sections if needed */
     $map_for_output = $this->add_new_sections( $map_for_output );
@@ -186,50 +178,46 @@ class PL_Map_Data{
   /**
    * Recursive function that iterates over a map and performs upgrades and substitutions.
    */
-  function replace_recursive( $container ){
+  function replace_recursive( $container ) {
 
-    foreach( $container as $index => &$item ){
-
+    foreach ( $container as $index => &$item ) {
 
       //$item = $this->replace_custom_sections( $item );
 
       $item = $this->replace_data( $index, $item );
 
       /** Index can't be content, as we skip levels in array format */
-      if( isset( $item['content'] ) && is_array( $item['content'] ) ){
+      if ( isset( $item['content'] ) && is_array( $item['content'] ) ) {
         $item['content'] = $this->replace_recursive( $item['content'] );
       }
-
     }
-    unset($item);
+    unset( $item );
     return $container;
   }
 
-  function replace_data( $index, $item ){
+  function replace_data( $index, $item ) {
 
-    if( ! isset( $item['object'] ) || $item['object'] == '' ){
-
+    if ( ! isset( $item['object'] ) || '' == $item['object'] ) {
 
       $item['object'] = 'PL_Container';
     }
 
     $item['object'] = apply_filters( 'pl_map_object', $item['object'] );
 
-    if(  ! isset( $item[ 'content' ] ) || ! is_array( $item[ 'content' ] ) ){
-      $item[ 'content' ] = array();
+    if ( ! isset( $item['content'] ) || ! is_array( $item['content'] ) ) {
+      $item['content'] = array();
     }
-
 
     /** If template, manually assign UID as page meta ID, else create new section if empty */
-    if(  ! isset( $item[ 'clone' ] ) ){
+    if ( ! isset( $item['clone'] ) ) {
 
       /** Create new section ID and set default settings */
-      $item[ 'clone' ] = $this->setup_new_section_from_map( $item );
+      $item['clone'] = $this->setup_new_section_from_map( $item );
 
     }
 
-    if( $item['object'] == 'template' ){
-        $item[ 'clone' ] = $item['object'];
+    if ( 'template' == $item['object'] ) {
+        $item['clone'] = $item['object'];
     }
 
     $item = apply_filters( 'pl_map_item', $item );
@@ -245,13 +233,13 @@ class PL_Map_Data{
    *
    * Query is rerun inside the factory and will get this data based on Clone ID
    */
-  function setup_new_section_from_map( $map_meta ){
+  function setup_new_section_from_map( $map_meta ) {
 
     global $pl_sections_data;
 
     $clone_id = pl_create_clone_id();
 
-    if( isset( $map_meta['settings'] ) ){
+    if ( isset( $map_meta['settings'] ) ) {
       $pl_sections_data->create_items( array( $clone_id => $map_meta['settings'] ) );
     }
     return $clone_id;
@@ -261,30 +249,30 @@ class PL_Map_Data{
   /**
    * Add new sections via $_GET in iframe if needed
    */
-  function add_new_sections( $map ){
+  function add_new_sections( $map ) {
 
     /** Security Precaution since we're using $_GET */
-    if( ( isset( $_GET['addSections'] ) || isset( $_GET['loadMap'] ) ) && ! current_user_can('edit_theme_options') ){
+    if ( ( isset( $_GET['addSections'] ) || isset( $_GET['loadMap'] ) ) && ! current_user_can( 'edit_theme_options' ) ) {
       return $map;
     }
 
     /** Get Add new data in GET */
-    if( isset( $_GET['addSections'] ) ){
+    if ( isset( $_GET['addSections'] ) ) {
 
       $add = json_decode( stripslashes( urldecode( $_GET['addSections'] ) ), true );
 
-      if( is_array( $add) ){
+      if ( is_array( $add ) ) {
 
         $formatted_add = array();
-        foreach( $add as $object ){
+        foreach ( $add as $object ) {
 
           $formatted_add[] = array(
-            'object' => $object
+            'object' => $object,
           );
         }
 
         // make sure index exists..
-        if( ! isset( $map['template']['content'] ) ) {
+        if ( ! isset( $map['template']['content'] ) ) {
           $map['template']['content'] = array();
         }
 
@@ -293,25 +281,23 @@ class PL_Map_Data{
     }
 
     /** Get Add new data in GET */
-    if( isset( $_GET['loadMap'] ) ){
+    if ( isset( $_GET['loadMap'] ) ) {
 
       $add = json_decode( stripslashes_deep( urldecode( $_GET['loadMap'] ) ), true );
 
+      if ( is_array( $add ) ) {
 
-      if( is_array( $add) ){
-        
         // make sure index exists..
-        if( ! isset( $map['template']['content'] ) ) {
+        if ( ! isset( $map['template']['content'] ) ) {
           $map['template']['content'] = array();
         }
 
         // echo '<pre>';
-        // print_r( $_GET['loadMap'] ); 
+        // print_r( $_GET['loadMap'] );
         // echo '</pre>';
 
-
         /** Only do this if you dont want them linked */
-        $configured = $this->configure_template( $add ); 
+        $configured = $this->configure_template( $add );
 
         $map['template']['content'] = array_merge( array( $configured ), $map['template']['content'] );
 
@@ -321,74 +307,61 @@ class PL_Map_Data{
     return $map;
   }
 
-  function add_template_data( $data ){
+  function add_template_data( $data ) {
 
-
-    $data = array_merge( $this->map_settings, $data);
+    $data = array_merge( $this->map_settings, $data );
 
     return $data;
   }
 
-  function configure_template( $map ){
+  function configure_template( $map ) {
 
-    $oldID = $map['clone']; 
+    $oldid = $map['clone'];
 
-    $newID = pl_create_clone_id();
+    $newid = pl_create_clone_id();
 
-    if( 'template' != $oldID ){
+    if ( 'template' != $oldid ) {
 
-      $map['clone'] = $newID; 
+      $map['clone'] = $newid;
 
-      if( isset( $map['settings'] ) ){
-        $this->map_settings[ $newID ] = $map['settings']; 
+      if ( isset( $map['settings'] ) ) {
+        $this->map_settings[ $newid ] = $map['settings'];
       }
-
-    }
-    
-    if( isset( $map['content'] ) && is_array( $map['content'] ) && ! empty( $map['content'] ) ){
-
-      foreach( $map['content'] as $key => $item ){
-
-         $map['content'][ $key ] = $this->configure_template( $item ); 
-
-      } 
-
     }
 
+    if ( isset( $map['content'] ) && is_array( $map['content'] ) && ! empty( $map['content'] ) ) {
 
-    return $map; 
+      foreach ( $map['content'] as $key => $item ) {
+
+         $map['content'][ $key ] = $this->configure_template( $item );
+
+      }
+    }
+
+    return $map;
   }
 
-  function default_region( $region ){
+  function default_region( $region ) {
 
     $d = array();
 
-    if( $region == 'header' ){
-
-      $d = array(
-          array(
-            'object'  => 'PL_Menus',
-          )
-        );
-    }
-
-    elseif( $region == 'footer' ){
+    if ( 'header' == $region ) {
       $d = array();
-    }
-
-    elseif( $region == 'template' ){
+    } elseif ( 'footer' == $region ) {
+      $d = array();
+    } elseif ( 'template' == $region ) {
 
       $d = array(
         array(
           'object'  => 'PL_Content',
-        )
+        ),
       );
     }
 
     $config = array(
       'content'   => $d,
       'clone'   => $region,
-      'object'  => $region
+      'object'  => $region,
     );
 
     return $config;
@@ -398,8 +371,7 @@ class PL_Map_Data{
    * Used by exporter to get all map data as an array.
    */
   function dump_map() {
-    $query = sprintf("SELECT * FROM $this->table_name;");
+    $query = sprintf( "SELECT * FROM $this->table_name;" );
     return $this->wpdb->get_results( $query );
   }
-
 }

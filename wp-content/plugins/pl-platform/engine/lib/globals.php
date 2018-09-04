@@ -8,8 +8,8 @@
  * @category  Class
  * @author    PageLines
  */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 class PL_Globals {
 
   public $version;
@@ -34,40 +34,45 @@ class PL_Globals {
     return self::$_instance;
   }
 
-  function __construct(){
+  function __construct() {
 
     $this->version = $this->get_version();
     $this->set_urls();
-    
+
     // reference with PL()->operations
     $this->operations = new PL_Platform_Operations( $this );
-  }
-  
-  /**
-   * Make urls available example: PL()->urls->forum  
-   */
-  public function set_urls(){
 
-    $editor_url = ( is_admin() ) ? home_url() : pl_get_current_url( );
+    $this->globals();
+  }
+
+  /**
+   * Make urls available example: PL()->urls->forum
+   */
+  public function set_urls() {
+
+    $home = ( isset( $_GET['post'] ) ) ? get_permalink( $_GET['post'] ) : home_url();
+
+    $editor_url = ( is_admin() ) ? $home : pl_get_current_url();
 
     $url_array = array(
-        'pagelines'   => 'http://www.pagelines.com',
-        'platform'    => 'http://www.pagelines.com/platform/',
-        'purchase'    => 'http://www.pagelines.com/purchase/',
-        'pro'         => 'http://www.pagelines.com/pro/',
+        'pagelines'   => 'https://www.pagelines.com',
+        'platform'    => 'https://www.pagelines.com/platform/',
+        'purchase'    => 'https://www.pagelines.com/purchase/',
+        'pro'         => 'https://www.pagelines.com/pro/',
         'oauth'       => 'https://www.pagelines.com/oauth',
-        'cdn'         => 'http://wpecdn.pagelines.com',
-        'docs'        => 'http://www.pagelines.com/resources',
+        'cdn'         => 'https://wpecdn.pagelines.com',
+        'docs'        => 'https://www.pagelines.com/resources',
         'forum'       => 'https://forum.pagelines.com',
+        'support'     => 'https://www.pagelines.com/support/',
         'my_account'  => 'https://www.pagelines.com/my-account',
         'quickstart'  => 'https://www.youtube.com/watch?v=1p7hEy9h06g',
-        'editor'      => add_query_arg( array( 'pl_edit' => 'on', 'plstart' => 'yes' ), $editor_url ),
-        'deactivate'  => add_query_arg( array( 'pl_edit' => 'off' ), $editor_url )
+        'editor'      => add_query_arg( array( 'pl_edit' => 'on', 'pl_start' => 'yes' ), $editor_url ),
+        'deactivate'  => add_query_arg( array( 'pl_edit' => 'off' ), $editor_url ),
       );
 
     $this->urls = new stdclass;
 
-    foreach( $url_array as $key => $url ){
+    foreach ( $url_array as $key => $url ) {
       $this->urls->$key = $url;
     }
 
@@ -82,6 +87,15 @@ class PL_Globals {
     $plugin   = get_plugin_data( PL_Platform()->config['plugin'] );
     $version  = $plugin['Version'];
     return $version;
+  }
+
+  private function globals() {
+    if ( ! defined( 'PL_ALTERNATIVE_FOOTER_SCRIPTS' ) ) {
+      $setting = pl_user_setting( 'footer_scripts_alt', '0' );
+      if ( '1' === $setting ) {
+        define( 'PL_ALTERNATIVE_FOOTER_SCRIPTS', true );
+      }
+    }
   }
 }
 /*

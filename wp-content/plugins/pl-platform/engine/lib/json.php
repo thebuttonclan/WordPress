@@ -10,8 +10,8 @@
  * @category  Class
  * @author    PageLines
  */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 class PL_JSON {
 
   /**
@@ -20,32 +20,28 @@ class PL_JSON {
    * @access public
    * @return void
    */
-  function __construct(){
+  function __construct() {
 
-    $this->additions = array(); 
+    $this->additions = array();
 
-    add_action('pl_json_data', array($this, 'load_info'), 1);
+    add_action( 'pl_json_data', array( $this, 'load_info' ), 1 );
 
-    add_action('pl_json_data', array($this, 'render'), 99);  
+    add_action( 'pl_json_data', array( $this, 'render' ), 99 );
 
-    add_action('wp_enqueue_scripts', array( $this, 'scripts'), 1000); 
+    add_action( 'wp_enqueue_scripts', array( $this, 'scripts' ), 1000 );
 
   }
 
-  function scripts(){
+  function scripts() {
 
-    pl_script( 'pl-site',     pl_framework_url('js') . '/site.js', array( 'jquery' ) );
+    pl_script( 'pl-site',     pl_framework_url( 'js' ) . '/site.js', array( 'jquery' ) );
 
-    pl_script( 'pl-common',   pl_framework_url('js') . '/common.js' );
+    pl_script( 'pl-common',   pl_framework_url( 'js' ) . '/common.js' );
 
-    pl_style( 'pl-components',  pl_framework_url( 'css' ) . '/components.css' );
-
-  //  wp_enqueue_media();
-
-    
+    pl_enqueue_components();
   }
 
-  function load_info(){
+  function load_info() {
 
     global $pl_page;
     $this->page = $pl_page;
@@ -59,41 +55,39 @@ class PL_JSON {
     global $plselector;
     $this->selector = $plselector;
 
-
   }
 
   /**
    * Get all json for output
    * @return string nested json string
    */
-  function get_json(){
+  function get_json() {
     $code = $this->encode( $this->set_data() );
-    return sprintf('PLData = %s%s', $code, "\n");
+    return sprintf( 'PLData = %s%s', $code, "\n" );
   }
 
-  function render(){
+  function render() {
 
     ob_start();
     ?><script>!function($){ <?php echo $this->get_json(); ?>}(window.jQuery);</script>
 <?php
-    echo apply_filters( 'pl_data_blob', ob_get_clean());
+    echo apply_filters( 'pl_data_blob', ob_get_clean() );
 
   }
 
   /**
    * Adds all data to a single array.
    */
-  function set_data(){
+  function set_data() {
 
     $array['config']      = $this->set_config_data();
 
     $array['urls']        = pl_get_system_urls();
 
-
     $array['modelData']   = $this->factory->get_view_model();
 
     $array['extraData']   = array();
-    
+
     return apply_filters( 'pl_site_json', $array );
 
   }
@@ -104,7 +98,7 @@ class PL_JSON {
 
   }
 
-  function get_query(){
+  function get_query() {
 
     global $wp_query;
 
@@ -112,7 +106,7 @@ class PL_JSON {
 
   }
 
-  function get_page_data(){
+  function get_page_data() {
 
     $data = array();
 
@@ -122,15 +116,15 @@ class PL_JSON {
 
     return $data;
   }
-  
+
   /**
    * TODO not used?
    */
-  function prep_localized_script_data( $script_data ){
+  function prep_localized_script_data( $script_data ) {
 
     $prepped_script_data = array();
 
-    foreach( $script_data as $key => $data ){
+    foreach ( $script_data as $key => $data ) {
 
       $prepped_script_data[ $key ] = $this->prep_data( $data );
 
@@ -139,28 +133,21 @@ class PL_JSON {
     return $prepped_script_data;
 
   }
-  
+
   /**
    * TODO Not used?
    */
-  function prep_data( $data ){
+  function prep_data( $data ) {
 
-    if( is_array( $data ) || is_object( $data ) )
-      $data = $this->encode( $data );
+    if ( is_array( $data ) || is_object( $data ) ) {
+      $data = $this->encode( $data ); } elseif ( is_int( $data ) ) {
+      $data = $data; } elseif ( is_bool( $data ) ) {
+        $data = ($data) ? 'true' : 'false'; } else {       $data = sprintf( "'%s'", $data ); }
 
-    elseif( is_int($data) )
-      $data = $data;
-
-    elseif( is_bool($data) )
-      $data = ($data) ? 'true' : 'false';
-
-    else
-      $data = sprintf("'%s'", $data);
-
-    return $data;
+      return $data;
   }
 
-  function do_workarea_json(){
+  function do_workarea_json() {
 
     wp_localize_script( 'pl-editing', 'PLWorkarea', $this->workarea_config() );
 
@@ -169,7 +156,7 @@ class PL_JSON {
   /**
    * Gets all config data in an array
    */
-  function set_config_data(){
+  function set_config_data() {
 
     global $wp;
     global $wp_query;
@@ -184,21 +171,18 @@ class PL_JSON {
     // URL of the current page
     $a['currentURL']  = add_query_arg( $wp->query_string, '', home_url( $wp->request ) );
 
-
     /** Should we save styles? set to 1 on change */
     $a['saveStyles']  = 0;
 
     /** Render mode is set on the fly as template is loaded */
-    
-    $a['tplRender']   = $pl_dynamic_templates;
 
+    $a['tplRender']   = $pl_dynamic_templates;
 
     // Currently active page template
     $a['tplActive']   = $this->page->template();
 
     // The current template scope mode
     $a['tplMode']     = $this->page->template_mode();
-
 
     $a['editID']      = pl_edit_id();
     $a['editslug']    = pl_edit_slug();
@@ -214,7 +198,6 @@ class PL_JSON {
     // The ID for the current type
     $a['termID']      = $this->page->termid;
     $a['termslug']    = $this->page->term_slug;
-
 
     // The slug ID of the current type (?)
     $a['typename']    = $this->page->type;
@@ -235,18 +218,20 @@ class PL_JSON {
     // Is developer mode activated?
     $a['debug']       = ( pl_dev_mode() ) ? 'true' : 'false';
 
+    $a['isPro']       = pl_is_professional();
+
     // Is this page a WP special page: e.g. multi-post, 404, etc..
     $a['isSpecial']   = $this->page->is_special();
 
-    $a['needsave']    = ( isset($_GET['needsave']) ) ? 1 : 0;
+    $a['needsave']    = ( isset( $_GET['needsave'] ) ) ? 1 : 0;
 
     $a['tplMap']      = $this->map->map;
-    
+
     $a['templateOpts']  = pl_get_template_settings();
 
-    $a['nonce'] = wp_create_nonce('pl-ajax-nonce');
-    return array_merge( $a, $this->additions );
+    $a['nonce'] = wp_create_nonce( 'pl-ajax-nonce' );
 
+    return array_merge( $a, $this->additions );
   }
 
   /**
@@ -254,9 +239,9 @@ class PL_JSON {
    * @param  object or array $object_or_array a PHP object or aray
    * @return json string
    */
-  function encode( $object_or_array ){
+  function encode( $object_or_array ) {
 
-    return json_encode( pl_convert_arrays_to_objects( $object_or_array ) );
+    return wp_json_encode( pl_convert_arrays_to_objects( $object_or_array ) );
 
   }
 }

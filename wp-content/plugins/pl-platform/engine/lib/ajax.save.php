@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * Save Page Data
  *
@@ -10,32 +10,32 @@
  * @category  Class
  * @author    PageLines
  */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 class PL_Save_Data{
-  
+
   function __construct() {
 
     /** Save Page Data */
-    add_action( 'pl_server_save_page', array( $this, 'save_page' ), 10, 2 ); 
+    add_action( 'pl_server_save_page', array( $this, 'save_page' ), 10, 2 );
 
     /** Save and Create New Template */
-    add_action( 'pl_server_tpl_action', array( $this, 'tpl_action' ), 10, 2 ); 
+    add_action( 'pl_server_tpl_action', array( $this, 'tpl_action' ), 10, 2 );
 
   }
 
-  function tpl_action( $response, $data ){
+  function tpl_action( $response, $data ) {
 
-    $response = pl_tpl_action( $response, $data ); 
+    $response = pl_tpl_action( $response, $data );
 
     return $response;
 
   }
 
-  function save_page( $response, $data ){
+  function save_page( $response, $data ) {
 
-    $this->pageID       = $data['pageID'];  // Used for page specifically
-    $this->editID       = $data['editID'];  // Used based on whether scoped to type, tax or page
+    $this->pageid       = $data['pageID'];  // Used for page specifically
+    $this->editid       = $data['editID'];  // Used based on whether scoped to type, tax or page
 
     $this->editslug     = $data['editslug'];  // Used based on whether scoped to type, tax or page
 
@@ -45,34 +45,34 @@ class PL_Save_Data{
 
     $response = $this->save_meta( $response, $data );
 
-    return apply_filters('pl_standard_save', $response, $data);
+    return apply_filters( 'pl_standard_save', $response, $data );
 
   }
 
   /**
-   * Save meta information to the page post ID. 
+   * Save meta information to the page post ID.
    * We need this to run queries and such.
    */
-  function save_meta( $response, $data ){
+  function save_meta( $response, $data ) {
 
-    $tplMode      = $data['tplMode'];
+    $tplmode      = $data['tplMode'];
 
     /** Save scope template mode */
-    update_post_meta( $this->pageID, 'pl_template_mode',    $tplMode );
+    update_post_meta( $this->pageid, 'pl_template_mode',    $tplmode );
 
     return $response;
   }
 
-  function save_model( $response, $data ){
+  function save_model( $response, $data ) {
 
     /** Convert json.stringify into an associative array */
-    $model = json_decode( stripslashes( $data['model'] ), true);
+    $model = json_decode( stripslashes( $data['model'] ), true );
 
-    if( is_array( $model ) ){
+    if ( is_array( $model ) ) {
 
-      global $pl_sections_data; 
+      global $pl_sections_data;
 
-      foreach( $model as $uid => $mod ){
+      foreach ( $model as $uid => $mod ) {
 
         /** Add a saved flag so we dont set defaults anymore... */
         $mod['saved'] = 1;
@@ -80,16 +80,16 @@ class PL_Save_Data{
         $pl_sections_data->update_or_insert( $uid, $mod );
 
       }
-    } 
+    }
 
-    $response['model'] =  $model;
+    $response['model'] = $model;
 
     return $response;
   }
 
-  function save_map( $response, $data ){
+  function save_map( $response, $data ) {
 
-    global $maps_data_handler; 
+    global $maps_data_handler;
 
     $response['result'] = $maps_data_handler->save_map( $data['map'], $this->editslug );
 

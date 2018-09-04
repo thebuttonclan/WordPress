@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * Platform Admin Settings Handler
  *
@@ -8,33 +8,29 @@
  * @category  Class
  * @author    PageLines
  */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 class PL_Platform_Settings {
 
-  function __construct(){
+  function __construct() {
 
-    add_filter( 'pl_platform_config_settings',    array($this, 'config'), 10, 2);
-    add_filter( 'pl_platform_config_meta',        array($this, 'config'), 10, 2);
-    add_filter( 'pl_platform_config_profile',     array($this, 'config'), 10, 2);
-    add_filter( 'pl_platform_customizer_config',  array($this, 'settings') );
+    add_filter( 'pl_platform_config_settings',    array( $this, 'config' ), 10, 2 );
+    add_filter( 'pl_platform_config_meta',        array( $this, 'config' ), 10, 2 );
+    add_filter( 'pl_platform_config_profile',     array( $this, 'config' ), 10, 2 );
+    add_filter( 'pl_platform_customizer_config',  array( $this, 'settings' ) );
 
   }
 
   /**
    * Master Settings configuration for the admin.
    */
-  function config( $d, $page ){
+  function config( $d, $page ) {
 
-    if( 'meta' == $page ){
+    if ( 'meta' == $page ) {
       $config = $this->meta_settings();
-    }
-
-    elseif( 'profile' == $page ){
+    } elseif ( 'profile' == $page ) {
       $config = $this->profile_settings();
-    }
-
-    else{
+    } else {
       $config = $this->settings();
     }
 
@@ -44,81 +40,77 @@ class PL_Platform_Settings {
         'mode'    => 'engine',
         'groups'  => $config,
         'hide_save' => ( is_multisite() && is_network_admin() ) ? true : false, // hide save button if on network super admin page
-      )
+      ),
     );
 
     return $d;
   }
 
-  function settings(){
-    
-    $settings = array(); 
+  function settings() {
+
+    $settings = array();
 
     $settings['welcome'] = array(
       'key'       => 'about',
       'icon'      => 'dashboard',
-      'pos'       => 15, 
-      'location'  => array('settings'),
+      'pos'       => 15,
+      'location'  => array( 'settings' ),
       'title'     => __( 'Dashboard', 'pl-platform' ),
       'opts'  => array(
 
         array(
           'key'     => 'welcometext',
           'type'    => 'longform',
-          'text'    => $this->welcome_message()
+          'text'    => $this->welcome_message(),
         ),
 
-      )
+      ),
     );
 
     $settings['site_social'] = array(
       'key'         => 'site_social',
       'icon'        => 'facebook-square',
-      'location'    => array('settings'),
+      'location'    => array( 'settings' ),
       'pos'         => 400,
       'title'       => __( 'Social / Local', 'pl-platform' ),
       'opts'  => array(
         array(
           'key'     => 'username_facebook',
           'type'    => 'text',
-          'place'   => "pagelines",
-          'title'   => __( 'Site Facebook Username', 'pl-platform' ),
+          'title'   => __( 'Sitewide Facebook Username', 'pl-platform' ),
         ),
         array(
           'key'     => 'username_twitter',
           'type'    => 'text',
-          'place'   => "pagelines",
-          'title'   => __( 'Site Twitter Username', 'pl-platform' ),
+          'title'   => __( 'Sitewide Twitter Username', 'pl-platform' ),
         ),
-        array(
-          'key'     => 'username_github',
-          'type'    => 'text',
-          'place'   => "pagelines-team",
-          'title'   => __( 'Site Github Username', 'pl-platform' ),
-        ),
+
         array(
           'type'    => 'multi',
-          'title'   => __( 'Instagram', 'pl-platform' ),
+          'title'   => __( 'Sitewide Instagram', 'pl-platform' ),
           'help'   => __( 'Your Instagram API access token.<br/> <a href="http://instagram.pixelunion.net/" target="_blank">Look it up here</a>.'
-            , 'pl-platform' ),
+          , 'pl-platform' ),
           'opts'    => array(
               array(
                 'key'     => 'instagram_token',
                 'type'    => 'text',
                 'title'   => __( 'Instagram Access Token', 'pl-platform' ),
-                
+
               ),
               array(
                 'key'     => 'username_instagram',
                 'type'    => 'text',
-                'place'   => 'arpowers',
-                'title'   => __( 'Instagram Username', 'pl-platform' )
+                'title'   => __( 'Instagram Username', 'pl-platform' ),
               ),
-            )
+            ),
         ),
-        
+        array(
+          'key'     => 'username_github',
+          'type'    => 'text',
+          'title'   => __( 'Sitewide Github Username', 'pl-platform' ),
+        ),
 
-      )
+      ),
     );
 
     $pl_advanced_opts = apply_filters('pl_advanced_settings', array(
@@ -130,50 +122,90 @@ class PL_Platform_Settings {
           'kses'    => 'bypass', // bypass wp_keses() for this option.
           'title'   => __( 'Header Scripts', 'pl-platform' ),
           'label'   => __( 'Enter Header HTML/JS', 'pl-platform' ),
-          'place'   => '<!-- Add HTML / Scripts here -->'
-        )
-      ));
+          'place'   => '<!-- Add HTML / Scripts here -->',
+        ),
+        array(
+          'key'     => 'footer_scripts_alt',
+          'type'    => 'checkbox',
+          'title'   => __( 'Footer Scripts', 'pl-platform' ),
+          'label'   => __( 'Enable Plugins Scripts Loading', 'pl-platform' ),
+          'help'    => __( 'Some plugins add javascript into the footer during pageload, if you encounter broken scripts this option should fix your issues.', 'pl-platform' ),
+        ),
+        array(
+          'key'     => 'search_placeholder',
+          'type'    => 'text',
+          'title'   => __( 'Search Placeholder Text', 'pl-platform' ),
+          'label'   => __( 'Search Placeholder', 'pl-platform' ),
+          'help'    => __( 'Optionally change the default search placeholder to something else.', 'pl-platform' ),
+        ),
+    ));
+
+    $settings['pl_professional'] = array(
+      'key'       => 'pl_professional',
+      'icon'      => 'check-square',
+      'pos'       => 450,
+      'title'     => __( 'Pro Options', 'pl-platform' ),
+      'location'   => array( 'settings' ),
+      'opts'  => array(
+        array(
+          'key'       => 'hide_pl_cred',
+          'type'      => 'checkbox',
+          'label'     => __( 'Remove PageLines link credit in Platform 5?', 'pl-platform' ),
+          'title'     => __( 'Remove PageLines Link Credit?', 'pl-platform' ),
+          'priv'      => 'pro',
+        ),
+        array(
+          'key'       => 'section_padding',
+          'type'      => 'text',
+          'label'     => __( 'Platform 5 uses 1rem for default section wrap padding, to overide add css here.<br>For example <kbd>0 0 0 10px</kbd>', 'pl-platform' ),
+          'title'     => __( 'Default CSS for section padding.', 'pl-platform' ),
+          'priv'      => 'pro',
+          'default'   => '',
+          'place'     => '1rem'
+        ),
+      ),
+    );
 
     $settings['advanced'] = array(
       'key'       => 'advanced',
       'icon'      => 'code',
-      'pos'       => 500, 
-      'location'  => array('settings'),
+      'pos'       => 500,
+      'location'  => array( 'settings' ),
       'title'     => __( 'Advanced', 'pl-platform' ),
-      'opts'      => $pl_advanced_opts
+      'opts'      => $pl_advanced_opts,
     );
 
-    $settings = apply_filters('pl_platform_settings_array', $settings);
+    $settings = apply_filters( 'pl_platform_settings_array', $settings );
 
     uasort( $settings, 'pl_compare_position' );
-    
+
     // if were on a multisite and we are in the network adnin area we *only* want to see the dashboard
     // as none of the settings panel will actually work.
-    if( is_multisite() && is_network_admin() ) {
+    if ( is_multisite() && is_network_admin() ) {
       $settings = array(
-        'welcome' => $settings['welcome']
+        'welcome' => $settings['welcome'],
       );
     }
     return $settings;
   }
 
-  function meta_settings(){
+  function meta_settings() {
 
-    $settings = apply_filters('pl_platform_meta_settings_array', array());
+    $settings = apply_filters( 'pl_platform_meta_settings_array', array() );
 
     uasort( $settings, 'pl_compare_position' );
 
     return $settings;
   }
 
-  function profile_settings(){
+  function profile_settings() {
 
-    $settings = array(); 
+    $settings = array();
 
     $settings['basics'] = array(
       'key'       => 'basics',
       'icon'      => 'pagelines',
-      'pos'       => 6, 
+      'pos'       => 6,
       'title'     => __( 'PageLines Info' , 'pl-platform' ),
       'opts'  => array(
         array(
@@ -181,8 +213,7 @@ class PL_Platform_Settings {
          'type'          => 'text',
          'title'         => __( 'Company Name', 'pl-platform' ),
         ),
-        
-        
+
         array(
          'key'           => 'pl_site',
          'type'          => 'text',
@@ -231,68 +262,154 @@ class PL_Platform_Settings {
          'type'          => 'text',
          'title'         => __( 'Your Home Country', 'pl-platform' ),
         ),
-        
-        
-      )
-    ); 
-    
 
+      ),
+    );
 
-    $settings = apply_filters('pl_platform_profile_settings_array', $settings);
+    $settings = apply_filters( 'pl_platform_profile_settings_array', $settings );
 
     uasort( $settings, 'pl_compare_position' );
 
     return $settings;
   }
 
-  function welcome_message(){
-    
-    $store_url = sprintf( '<a href="%s">%s</a>', PL_Platform()->url('store'), __( 'Extension Engine', 'pl-platform' ) );
-    ob_start();
-?>
-    <div class="intro clearfix">
-      <img class="theme-screen" src="<?php echo pl_framework_url('images') . '/PL5.png';?>" />
-      <h3><?php _e( 'Welcome to PageLines', 'pl-platform' ); ?></h3>
-      <p><?php _e( 'Congratulations! You\'re running PageLines.<br/>PageLines adds insanely-fast editing and customization tools to your site.<br/> ', 'pl-platform' ); ?></p>
-      <div class="clear" ></div>
-    </div>
+  function welcome_steps() {
 
-    <?php if( PL_Platform()->is_oriented() && ! PL_Platform()->is_pro() ):?>
+    if ( ! PL_Platform()->oauth->is_connected() ) : ?>
 
-      <h3><?php _e( 'You are using the free version.', 'pl-platform' ); ?></h3>
-      <ul class="reference-list">
+    <h3 class="extend-limited"><?php _e( '<span class="subtle">Next Step:</span> Add PageLines Account', 'pl-platform' ); ?></h3>
+    <ul class="reference-list nextstep extend-limited">
+      <li>
+        <div class="list-icon"><i class="pl-icon pl-icon-plus"></i></div>
+        <h4><?php _e( 'Add Your PageLines.com Account', 'pl-platform' ); ?></h4>
+        <p>
+          <?php _e( 'Needed for one click install, upgrades and support.', 'pl-platform' ); ?>
+        </p>
+        <p>
+          <a class="button button-primary" href="<?php echo PL_Platform()->oauth->connect_account_link();?>"><i class="pl-icon pl-icon-plus"></i>&nbsp;<?php _e( 'Add', 'pl-platform' ); ?> <i class="pl-icon pl-icon-caret-right"></i></a>
+        </p>
+      </li>
+    </ul>
+
+    <?php elseif ( ! PL_Platform()->has_installed_something() ) :  ?>
+
+      <h3 class="extend-limited"><?php _e( '<span class="subtle">Next Step:</span> Install Extensions', 'pl-platform' ); ?></h3>
+      <ul class="reference-list nextstep extend-limited">
         <li>
-          <div class="list-icon"><i class="pl-icon pl-icon-pagelines"></i></div>
-          <h4><?php _e( 'Get the most from PageLines with Pro.', 'pl-platform' ); ?></h4>
+          <div class="list-icon"><i class="pl-icon pl-icon-plug"></i></div>
+          <h4><?php _e( 'Get PageLines Extensions', 'pl-platform' ); ?></h4>
           <p>
-            <?php _e( 'Get all pro extensions plus more every month. Also updates, options &amp; support.', 'pl-platform' ); ?>
+            <?php _e( 'Platform is extension based, go and install some extensions.', 'pl-platform' ); ?>
           </p>
           <p>
-            <?php 
-            if( ! PL_Platform()->oauth->can_register_site() ){
-              $getclass = 'primary'; 
-              $actclass = 'disabled'; 
-            }
-            else {
-              $getclass = 'secondary'; 
-              $actclass = 'primary'; 
-            }
-
-            $domains = PL_Platform()->oauth->get_domain_data_format(); 
-
-            ?>
-            <a class="button button-<?php echo $getclass;?>" target="_blank" href="<?php echo PL()->urls->purchase;?>"><i class="pl-icon pl-icon-shopping-cart"></i>&nbsp;<?php _e( 'Purchase Pro License', 'pl-platform' ); ?> <i class="pl-icon pl-icon-caret-right"></i></a>
-
-            <a class="button button-<?php echo $actclass;?>" target="_blank" href="<?php echo PL_Platform()->url('account');?>">
-              <i class="pl-icon pl-icon-bolt"></i>&nbsp;
-              <?php _e( 'Activate Pro', 'pl-platform' ); ?>
-              <?php printf('%s', $domains); ?>
-              </a>
+            <a class="button button-primary" target="_blank" href="<?php echo PL_Platform()->url( 'extend' );?>"><i class="pl-icon pl-icon-plug"></i> <?php _e( 'Extension Engine', 'pl-platform' ); ?> <i class="pl-icon pl-icon-caret-right"></i></a>
           </p>
         </li>
       </ul>
 
-    <?php endif; ?>
+    <?php elseif ( PL_Platform()->is_oriented() && ! PL_Platform()->is_pro() ) :  ?>
+
+          <h3 class="extend-limited"><?php _e( '<span class="subtle">Next Step:</span> Upgrade to Pro Version', 'pl-platform' ); ?></h3>
+          <ul class="reference-list nextstep extend-limited">
+            <li>
+              <div class="list-icon"><i class="pl-icon pl-icon-pagelines"></i></div>
+              <h4><?php _e( 'Get the most from PageLines with Pro.', 'pl-platform' ); ?></h4>
+              <p>
+                <?php _e( 'Get all pro extensions plus more every month. Also updates, options &amp; support.', 'pl-platform' ); ?>
+              </p>
+              <p>
+                <?php
+                if ( ! PL_Platform()->oauth->can_register_site() ) {
+                  $getclass = 'primary';
+                  $actclass = 'disabled';
+                } else {
+                  $getclass = 'secondary';
+                  $actclass = 'primary';
+                }
+
+                $domains = PL_Platform()->oauth->get_domain_data_format();
+
+                ?>
+                <a class="button button-<?php echo $getclass;?>" target="_blank" href="<?php echo PL()->urls->purchase;?>"><i class="pl-icon pl-icon-shopping-cart"></i>&nbsp;<?php _e( 'Get License', 'pl-platform' ); ?> <i class="pl-icon pl-icon-caret-right"></i></a>
+
+                <a class="button button-<?php echo $actclass;?>" target="_blank" href="<?php echo PL_Platform()->oauth->domain_activate_link();?>">
+                  <i class="pl-icon pl-icon-bolt"></i>&nbsp;
+                  <?php _e( 'Activate Pro', 'pl-platform' ); ?>
+                  <?php printf( '%s', $domains ); ?>
+                  </a>
+              </p>
+            </li>
+          </ul>
+
+    <?php endif;
+
+  }
+
+  function use_pagelines_framework() {
+
+    if ( ! PL_Platform()->is_framework_installed() || ! PL_Platform()->is_framework_active() ) :
+
+      if ( ! PL_Platform()->is_framework_installed() ) {
+
+        $install_class = 'button-primary';
+
+        $activate_class = 'button-secondary disabled';
+
+      } else {
+
+        $install_class = 'button-secondary disabled';
+
+        $activate_class = 'button-primary';
+
+      }
+      ?>
+
+      <h3 class="extend-limited"><?php _e( '<span class="subtle">Tip:</span> Use PageLines Framework', 'pl-platform' ); ?></h3>
+      <ul class="reference-list nextstep extend-limited">
+        <li>
+          <div class="list-icon"><i class="pl-icon pl-icon-list-alt"></i></div>
+          <h4><?php _e( 'Use PageLines Framework', 'pl-platform' ); ?></h4>
+          <p>
+            <?php _e( 'PageLines Framework is optimized for use with PageLines Platform.', 'pl-platform' ); ?>
+          </p>
+          <p>
+            <?php _e( 'It is fully-responsive, has a ton of options, and has support for child themes, templates and more.', 'pl-platform' ); ?>
+          </p>
+          <p>
+
+
+            <a class="button <?php echo $install_class;?>" href="<?php echo PL()->operations->framework_install_url();?>">
+              <i class="pl-icon pl-icon-download"></i>&nbsp;<?php _e( 'Install', 'pl-platform' ); ?> <i class="pl-icon pl-icon-caret-right"></i>
+            </a>
+            <a class="button <?php echo $activate_class;?>" href="<?php echo admin_url( 'themes.php' );   ?>">
+              <i class="pl-icon pl-icon-bolt"></i>&nbsp;<?php _e( 'Activate', 'pl-platform' ); ?> <i class="pl-icon pl-icon-caret-right"></i>
+            </a>
+
+          </p>
+        </li>
+      </ul>
+
+
+
+    <?php endif;
+
+  }
+
+  function welcome_message() {
+
+    $store_url = sprintf( '<a href="%s">%s</a>', PL_Platform()->url( 'store' ), __( 'Extension Engine', 'pl-platform' ) );
+    ob_start();
+?>
+    <div class="intro clearfix">
+      <img alt="Platform 5" class="theme-screen" src="<?php echo pl_framework_url( 'images' ) . '/PL5.png';?>" />
+      <h3><?php _e( 'Welcome to PageLines', 'pl-platform' ); ?></h3>
+      <p><?php _e( "Congratulations! You're running PageLines. PageLines adds insanely-fast editing and customization tools to your site.", 'pl-platform' ); ?></p>
+      <div class="clear" ></div>
+    </div>
+
+    <?php $this->welcome_steps();?>
+
+    <?php $this->use_pagelines_framework();?>
 
     <h3><?php _e( 'What can you do with PageLines? Everything.', 'pl-platform' ); ?></h3>
     <ul class="reference-list">
@@ -313,7 +430,7 @@ class PL_Platform_Settings {
           <?php printf( __( 'PageLines is built to be extended. Add some with the %s.', 'pl-platform' ), $store_url ); ?>
         </p>
         <p>
-          <a class="button button-secondary" href="<?php echo PL_Platform()->url('extend');?>"><i class="pl-icon pl-icon-plug"></i> <?php _e( 'Install New Extensions', 'pl-platform' ); ?></a>
+          <a class="button button-secondary" href="<?php echo PL_Platform()->url( 'extend' );?>"><i class="pl-icon pl-icon-plug"></i> <?php _e( 'Install New Extensions', 'pl-platform' ); ?></a>
         </p>
       </li>
       <li>
@@ -323,7 +440,7 @@ class PL_Platform_Settings {
           <?php printf( __( 'Join the PageLines community channels for help, updates, and great conversation.', 'pl-platform' ), $store_url ); ?>
         </p>
         <p>
-          <a class="button" target="_blank" href="http://www.pagelines.com/community"><i class="pl-icon pl-icon-slack"></i> <?php _e( 'Community Overview', 'pl-platform' ); ?></a>
+          <a class="button" target="_blank" href="https://www.pagelines.com/community"><i class="pl-icon pl-icon-slack"></i> <?php _e( 'Community Overview', 'pl-platform' ); ?></a>
         </p>
       </li>
       <li>
@@ -333,21 +450,21 @@ class PL_Platform_Settings {
           <?php printf( __( 'Check out the PageLines Forums or documentation resources.', 'pl-platform' ), $store_url ); ?>
         </p>
         <p>
-          <a class="button" href="http://www.pagelines.com/support" target="_blank"><i class="pl-icon pl-icon-smile-o"></i> <?php _e( 'Support Overview', 'pl-platform' ); ?></a>
+          <a class="button" href="https://www.pagelines.com/support" target="_blank"><i class="pl-icon pl-icon-smile-o"></i> <?php _e( 'Support Overview', 'pl-platform' ); ?></a>
         </p>
       </li>
       <li>
-        <div class="list-icon"><img src="<?php echo pl_framework_url('images') . '/avatar-powers.jpg';?>" /></div>
+        <div class="list-icon"><img alt="Andrew Powers" src="<?php echo pl_framework_url( 'images' ) . '/avatar-powers.jpg';?>" /></div>
         <h4><?php _e( 'A note from me...', 'pl-platform' ); ?></h4>
-        <p><?php _e( "Good luck with your site. We're happy and excited for you. Don't forget that we're here to help and your feedback is always welcome.", 'pl-platform' ); ?> <a href="http://www.pagelines.com/about" target="_blank">About PageLines</a></p>
+        <p><?php _e( "Good luck with your site. We're happy and excited for you. Don't forget that we're here to help and your feedback is always welcome.", 'pl-platform' ); ?> <a href="https://www.pagelines.com/about" target="_blank">About PageLines</a></p>
         <div class="signature">
           <p><?php _e( 'Sincerely', 'pl-platform' ); ?>,</p>
-          <img src="<?php echo pl_framework_url('images') . '/signature-founder.png';?>" />
+          <img alt="Signature" src="<?php echo pl_framework_url( 'images' ) . '/signature-founder.png';?>" />
           <div class="citation"><?php _e( 'Andrew Powers, Founder', 'pl-platform' ); ?></div>
         </div>
       </li>
     </ul>
-    
+
     <?php
     return ob_get_clean();
   }

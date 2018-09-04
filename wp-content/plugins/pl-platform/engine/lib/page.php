@@ -10,8 +10,8 @@
  * @category  Class
  * @author    PageLines
  */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 class PL_Page {
 
   var $special_base = 70000000;
@@ -20,21 +20,19 @@ class PL_Page {
 
   function __construct( $args = array() ) {
 
-    $args = wp_parse_args($args, $this->defaults());
+    $args = wp_parse_args( $args, $this->defaults() );
 
     $mode = $args['mode'];
 
     add_filter( 'parse_request', array( $this, 'check_for_type' ) );
 
-    if( $mode == 'ajax' ){
+    if ( 'ajax' == $mode ) {
 
       $this->id = $args['pageID'];
 
       $this->typeid = $args['typeID'];
 
-    } 
-
-    else {
+    } else {
 
       $slug             = $this->get_current_page_slug();
 
@@ -59,9 +57,9 @@ class PL_Page {
       $this->template   = $this->template();
 
     }
-    
+
   }
-  
+
   /**
    * Setup pl_404 variable
    */
@@ -69,7 +67,7 @@ class PL_Page {
 
     global $pl_404;
 
-    if( isset( $wp->query_vars['pagename']) && false !== strpos($wp->query_vars['pagename'], 'members' ) ) {
+    if ( isset( $wp->query_vars['pagename'] ) && false !== strpos( $wp->query_vars['pagename'], 'members' ) ) {
 
       $pl_404 = false;
     } else {
@@ -77,128 +75,106 @@ class PL_Page {
     }
   }
 
-  function defaults(){
+  function defaults() {
     $d = array(
       'mode'    => 'standard',
       'pageID'  => '',
-      'typeID'  => ''
+      'typeID'  => '',
     );
     return $d;
   }
 
   /**
-   * Get the editing scope of the current page. 
+   * Get the editing scope of the current page.
    * Either local for specific ID or type wide for entire category default.
    */
-  function template_mode(){
+  function template_mode() {
 
-    
-    if( isset( $_GET['tplScope'] ) ){
+    if ( isset( $_GET['tplScope'] ) ) {
       $mode = $_GET['tplScope'];
-    }
+    } /** Set template scope on most specific ID */
+    elseif ( get_post_meta( $this->id, 'pl_template_mode', true ) ) {
 
-    /** Set template scope on most specific ID */
-    elseif( get_post_meta( $this->id, 'pl_template_mode', true) ){
+      $mode = get_post_meta( $this->id, 'pl_template_mode', true );
 
-      $mode = get_post_meta( $this->id, 'pl_template_mode', true);
-    
-    }
-
-    /** 
+    } /**
      * If its a taxonomy archive, set to all of term mode, instead of individual taxonomy category
      * If its a page template, start by using the settings for that specific template
      */
-    elseif( $this->type == 'taxonomy' || ($this->type == 'page' && '' != $this->term_slug &&  ! is_numeric($this->term_slug) ) ){
+    elseif ( 'taxonomy' == $this->type || ( 'page' == $this->type && '' != $this->term_slug && ! is_numeric( $this->term_slug ) ) ) {
 
       $mode = 'term';
-    }
-    
-    elseif( $this->type == 'page' || $this->type == 'post_type' ) {
+    } elseif ( 'page' == $this->type ||  'post_type' == $this->type ) {
 
       $mode = 'local';
 
-    } 
-
-    else {
+    } else {
 
       $mode = 'type';
 
     }
 
-    if( $mode == 'meta' )
-      $mode = 'local';
+    if ( 'meta' == $mode ) {
+      $mode = 'local'; }
 
     return $mode;
 
   }
 
-  function get_edit_id(){
-
+  function get_edit_id() {
 
     $mode = $this->template_mode();
 
-    if( $mode == 'type' ){
+    if ( 'type' == $mode ) {
       $id = $this->typeid;
-    }
-
-    elseif( $mode == 'term' ){
+    } elseif ( 'term' == $mode ) {
       $id = $this->termid;
-    }
-
-    else
+    } else {
       $id = $this->id;
-
+    }
 
     return $id;
 
   }
 
-  function get_edit_slug(){
-
+  function get_edit_slug() {
 
     $mode = $this->template_mode();
 
-    if( $mode == 'type' ){
+    if ( 'type' == $mode ) {
       $id = $this->type_slug;
-    }
-
-    elseif( $mode == 'term' ){
+    } elseif ( 'term' == $mode ) {
       $id = $this->term_slug;
-    }
-
-    else
+    } else {
       $id = $this->meta_slug;
-
+    }
 
     return $id;
 
   }
 
-  
-  function template(){
+
+  function template() {
 
     global $pl_custom_template;
-    
-    if( isset($pl_custom_template) && isset($pl_custom_template['key']))
-      return $pl_custom_template['key']; 
-    else 
-      return '';
+
+    if ( isset( $pl_custom_template ) && isset( $pl_custom_template['key'] ) ) {
+      return $pl_custom_template['key']; } else {       return ''; }
 
   }
 
-  function meta_id(){
+  function meta_id() {
 
+    if (  'local' == $this->mode ) {
+      return $this->id;
+    } else {
+        return $this->typeid;
+    }
 
-    if( $this->mode == 'local' )
-      return $this->id; 
-    else 
-      return $this->typeid;
-
-    
   }
 
 
-  function lookup_array(){
+  function lookup_array() {
     $lookup_array = array(
       'blog',
       'category',
@@ -208,25 +184,23 @@ class PL_Page {
       'date',
       'page',
       'post',
-      'four04'
+      'four04',
     );
-    
+
     return $lookup_array;
   }
 
-  function special_index_lookup( $typeID = '', $metaID = '', $termID = '' ){
+  function special_index_lookup( $typeid = '', $metaid = '', $termid = '' ) {
 
-    $typeID = ( !empty( $typeID ) ) ? $typeID : 0;
+    $typeid = ( ! empty( $typeid ) ) ? $typeid : 0;
 
-    
-    $index = array_search( $typeID, $this->lookup_array() );
-    
-    if( ! $index ){
-      $index = pl_generate_number_from_string( $typeID . $metaID . $termID );  
-    } 
+    $index = array_search( $typeid, $this->lookup_array() );
 
+    if ( ! $index ) {
+      $index = pl_generate_number_from_string( $typeid . $metaid . $termid );
+    }
 
-    $base = ( empty( $metaID ) ) ? $this->special_base : $this->special_base_archive;
+    $base = ( empty( $metaid ) ) ? $this->special_base : $this->special_base_archive;
 
     return $base + $index;
 
@@ -235,21 +209,17 @@ class PL_Page {
   /**
    * Determines if the current page supports meta ID by default or if one needs to be assigned.
    */
-  function is_special(){
+  function is_special() {
 
-    if ( is_404() || is_home() || is_search() || is_archive() )
-      return true;
-    else
-      return false;
+    if ( is_404() || is_home() || is_search() || is_archive() ) {
+      return true; } else {       return false; }
 
   }
-  
-  function is_posts_page(){
 
-    if ( is_home() || is_search() || is_archive() || is_category() )
-      return true;
-    else
-      return false;
+  function is_posts_page() {
+
+    if ( is_home() || is_search() || is_archive() || is_category() ) {
+      return true; } else {       return false; }
 
   }
 
@@ -259,51 +229,43 @@ class PL_Page {
 
     $queried_object = get_queried_object();
 
-
     if ( is_singular() ) {
 
       $post = $queried_object;
-      $post_type = get_post_type_object($post->post_type);
+      $post_type = get_post_type_object( $post->post_type );
 
       $current_page[] = 'single';
 
-      if ( $post_type->name )
-        $current_page[] = 'single__' . $post_type->name;
+      if ( $post_type->name ) {
+        $current_page[] = 'single__' . $post_type->name; }
 
       $posts = array( $post->ID );
 
-
-      /** I dont know why we origially looked at parent pages. 
+      /** I dont know why we origially looked at parent pages.
         * Assuming its post type related
        */
-      while ( $post->post_parent != 0 ) {
+      while ( 0 != $post->post_parent ) {
 
-        $post = get_post($post->post_parent);
+        $post = get_post( $post->post_parent );
         $posts[] = $post->ID;
 
       }
 
-      foreach ( array_reverse($posts) as $post_id ){
-        if ( $post_type->name && $post_id ){
+      foreach ( array_reverse( $posts ) as $post_id ) {
+        if ( $post_type->name && $post_id ) {
           $current_page[] = sprintf( 'single__%s__%s', $post_type->name, $post_id );
 
-          if( 'page' == $post_type->name ){
+          if ( 'page' == $post_type->name ) {
 
-            $template_name = str_replace( '.php', '', get_page_template_slug( $post_id ) ); 
+            $template_name = str_replace( '.php', '', get_page_template_slug( $post_id ) );
 
-            if( '' != $template_name ){
+            if ( '' != $template_name ) {
               $current_page[] = sprintf( 'single__%s__%s__%s', $post_type->name, $post_id, $template_name );
             }
-
           }
         }
       }
-
-    
-    
-    } 
-
-    elseif ( is_home() || is_archive() || is_search() ) {
+    } elseif ( is_home() || is_archive() || is_search() ) {
 
       $current_page[] = 'archive';
 
@@ -311,22 +273,16 @@ class PL_Page {
 
         $current_page[] = 'archive__post__blog';
 
-      } 
-
-      elseif ( is_date() ) {
+      } elseif ( is_date() ) {
 
         $current_page[] = 'archive__post__date';
 
-      } 
-
-      elseif ( is_author() ) {
+      } elseif ( is_author() ) {
 
         $current_page[] = 'archive__post__author';
-        if( isset( $queried_object->ID ) )
-          $current_page[] = 'archive__post__author__' . $queried_object->ID;
-      } 
-
-      elseif ( is_category() ) {
+        if ( isset( $queried_object->ID ) ) {
+          $current_page[] = 'archive__post__author__' . $queried_object->ID; }
+      } elseif ( is_category() ) {
 
         $category = $queried_object;
         $ancestor_categories = array();
@@ -334,57 +290,43 @@ class PL_Page {
         $current_page[] = 'archive__post__category';
 
         /* Ancestor categories */
-          while ( $category->category_parent != 0 ) {
-            $category = get_category($category->category_parent);
-            $ancestor_categories[] = $category->term_id;
-          }
+        while ( 0 != $category->category_parent ) {
+          $category = get_category( $category->category_parent );
+          $ancestor_categories[] = $category->term_id;
+        }
 
-          foreach ( array_reverse($ancestor_categories) as $ancestor_category_id )
-            $current_page[] = 'archive__post__category__' . $ancestor_category_id;
+        foreach ( array_reverse( $ancestor_categories ) as $ancestor_category_id ) {
+          $current_page[] = 'archive__post__category__' . $ancestor_category_id; }
 
         /* Original queried category */
         $current_page[] = 'archive__post__category__' . $queried_object->term_id;
 
-      } 
-
-      elseif ( is_search() ) {
+      } elseif ( is_search() ) {
 
         $current_page[] = 'archive__post__search';
 
-        if( isset( $_GET['post_type'] ) ){
+        if ( isset( $_GET['post_type'] ) ) {
           $current_page[] = 'archive__' . $_GET['post_type'] . '__search-'. $_GET['post_type'];
-        } 
-
-      } 
-
-      elseif ( is_tag() ) {
+        }
+      } elseif ( is_tag() ) {
 
         $current_page[] = 'archive__post__post_tag';
         $current_page[] = 'archive__post__post_tag__' . $queried_object->term_id;
 
-      } 
+      } elseif ( is_tax() ) {
 
-
-      elseif ( is_tax() ) {
-
-
-        $base = ( $queried_object->taxonomy == 'post_format' ) ? 'archive__post' : 'archive__' . get_post_type();
+        $base = ( 'post_format' == $queried_object->taxonomy ) ? 'archive__post' : 'archive__' . get_post_type();
 
         $current_page[] = $base;
         $current_page[] = $base. '__' . $queried_object->taxonomy;
         $current_page[] = $base. '__' . $queried_object->taxonomy . '__' . $queried_object->term_id;
 
-      } 
-
-      elseif ( is_post_type_archive() ) {
+      } elseif ( is_post_type_archive() ) {
 
         $current_page[] = 'archive__' . $queried_object->name . '__archive';
 
       }
-
-    } 
-
-    elseif ( is_404() ) {
+    } elseif ( is_404() ) {
 
       $current_page[] = 'special__four04';
 
@@ -407,20 +349,19 @@ class PL_Page {
 
   }
 
-  function get_scope( $slug ){
+  function get_scope( $slug ) {
 
     $scope = array();
 
+    $page_slug_fragments = explode( '__', $slug );
 
-    $page_slug_fragments = explode( '__', $slug);
+    $scope['group']   = $page_slug_fragments[0];
 
-    $scope['group']   = $page_slug_fragments[0]; 
+    $scope['type']    = ( isset( $page_slug_fragments[1] ) ) ? $page_slug_fragments[1] : '';
 
-    $scope['type']    = ( isset($page_slug_fragments[1]) ) ? $page_slug_fragments[1] : ''; 
+    $scope['meta']    = ( isset( $page_slug_fragments[2] ) ) ? $page_slug_fragments[2] : '';
 
-    $scope['meta']    = ( isset($page_slug_fragments[2]) ) ? $page_slug_fragments[2] : '';
-
-    $scope['term']    = ( isset($page_slug_fragments[3]) ) ? $page_slug_fragments[3] : '';
+    $scope['term']    = ( isset( $page_slug_fragments[3] ) ) ? $page_slug_fragments[3] : '';
 
     return $scope;
 
@@ -430,327 +371,262 @@ class PL_Page {
    * Gets a unique post index based on the slug for the page.
    * The base number is arbitrary but large enough not to conflict with normal page/post IDs
    */
-  function get_index( $slug, $mode = 'page', $slug_mode = false ){
+  function get_index( $slug, $mode = 'page', $slug_mode = false ) {
 
     $base = true;
 
     $scope = $this->get_scope( $slug );
 
+    if ( true === $slug_mode ) {
 
-    if( true === $slug_mode ){
-
-      if( 'type' == $mode ){
-        return $scope['type']; 
+      if ( 'type' == $mode ) {
+        return $scope['type'];
       }
 
-      
-
       /** Page template should just have slug of page template as has nothing to do with type/id */
-      if( is_numeric( $scope['meta'] ) && $mode == 'term' && '' != $scope['term'] ){
+      if ( is_numeric( $scope['meta'] ) && 'term' == $mode && '' != $scope['term'] ) {
 
         return $scope['term'];
 
-      }
+      } /** If page mode, return post id if its set .. this will be same for term mode if no template is selected */
+      elseif ( is_numeric( $scope['meta'] ) ) {
 
-      /** If page mode, return post id if its set .. this will be same for term mode if no template is selected */
-      elseif( is_numeric( $scope['meta'] ) ){
-      
         return $scope['meta'];
-      
-      } 
 
-      else{
+      } else {
 
-        $index = $scope['type']; 
+        $index = $scope['type'];
 
-        if( '' != $scope['meta'] )
-          $index .= '__' . $scope['meta']; 
+        if ( '' != $scope['meta'] ) {
+          $index .= '__' . $scope['meta']; }
 
         /** Add term if its for page scope, but term scope is for entire category so remove remove term from that */
-        if( '' != $scope['term'] && 'term' != $mode )
-          $index .= '__' . $scope['term']; 
-
+        if ( '' != $scope['term'] && 'term' != $mode ) {
+          $index .= '__' . $scope['term']; }
 
         return $index;
       }
-   
     }
 
-
-
-    
-    if( is_numeric( $scope['meta'] ) && $mode == 'page' ){
+    if ( is_numeric( $scope['meta'] ) && 'page' == $mode ) {
 
       return $scope['meta'];
-    
+
     }
 
     /**
      * If Type Mode Unset Meta and Term
      * If Meta Mode Unset Term
      */
-    if( 'type' == $mode ){
-      $scope['meta'] = ''; 
+    if ( 'type' == $mode ) {
+      $scope['meta'] = '';
       $scope['term'] = '';
     }
 
-    if( 'page' == $mode ){
+    if ( 'page' == $mode ) {
       $scope['term'] = '';
     }
 
-
-    if( $scope['term'] == '' ){
+    if ( '' == $scope['term'] ) {
 
       /** Type only provided */
-      if( $scope['meta'] == '' ){
+      if ( '' == $scope['meta'] ) {
 
         $index = array_search( $scope['type'], $this->lookup_array() );
 
-
-      }
-
-      elseif( is_numeric( $scope['meta'] ) ){
-
-        
+      } elseif ( is_numeric( $scope['meta'] ) ) {
 
         $base   = false;
         $index  = $scope['meta'];
 
-      }
-
-      else{
+      } else {
         // var_dump( $scope['type'] );
         // var_dump( $scope['meta'] );
         // var_dump( $mode );
 
         $index = array_search( $scope['meta'], $this->lookup_array() );
 
-       // var_dump( $index );
+        // var_dump( $index );
       }
-
-
     }
 
-    if( ! isset( $index ) || $index === false ){
-      $index = pl_generate_number_from_string( $scope['type'] . $scope['meta'] . $scope['term'] ); 
-    } 
+    if ( ! isset( $index ) || false === $index ) {
+      $index = pl_generate_number_from_string( $scope['type'] . $scope['meta'] . $scope['term'] );
+    }
 
-
-    if( $base ){
+    if ( $base ) {
 
       $base = $this->special_base;
 
       return $base + $index;
 
-    } 
-
-    else {
+    } else {
       return $index;
     }
-    
-
-    
 
   }
 
-  function get_page_slug_info( $page_slug, $item = 'all' ){
+
+  function get_page_slug_info( $page_slug, $item = 'all' ) {
 
     $return = array();
 
-    $page_slug_fragments = explode( '__', $page_slug);
+    $page_slug_fragments = explode( '__', $page_slug );
 
-    $groupID    = $page_slug_fragments[0]; 
+    $groupid    = $page_slug_fragments[0];
 
-    $typeID     = ( isset($page_slug_fragments[1]) ) ? $page_slug_fragments[1] : ''; 
+    $typeid     = ( isset( $page_slug_fragments[1] ) ) ? $page_slug_fragments[1] : '';
 
-    $metaID     = ( isset($page_slug_fragments[2]) ) ? $page_slug_fragments[2] : '';
+    $metaid     = ( isset( $page_slug_fragments[2] ) ) ? $page_slug_fragments[2] : '';
 
-    $termID     = ( isset($page_slug_fragments[3]) ) ? $page_slug_fragments[3] : '';
+    $termid     = ( isset( $page_slug_fragments[3] ) ) ? $page_slug_fragments[3] : '';
 
+    $term_slug        = ( '' != $termid && is_numeric( $metaid ) ) ? $termid : $metaid;
 
-    $term_slug        = ( $termID != '' && is_numeric( $metaID ) ) ? $termID : $metaID; 
+    $type_slug        = ( '' != $typeid ) ? $typeid : $groupid;
 
-    $type_slug        = ( $typeID != '' ) ? $typeID : $groupID;
-
-    $defaults = array( 
-      'url'     => '', 
-      'name'    => pl_ui_key( $type_slug ), 
-      'slug'    => $page_slug, 
+    $defaults = array(
+      'url'     => '',
+      'name'    => pl_ui_key( $type_slug ),
+      'slug'    => $page_slug,
       'type'    => $type_slug,
-      'term'    => $term_slug
+      'term'    => $term_slug,
 
     );
 
-
     /** Single Posts, Pages, etc..  */
-    if( $groupID == 'single' ){
+    if ( 'single' == $groupid ) {
 
       /* If a page ID is provided, we have a link */
-      $return['url'] = ( isset( $metaID ) ) ? get_permalink( $metaID ) : '';
+      $return['url'] = ( isset( $metaid ) ) ? get_permalink( $metaid ) : '';
 
-      
-      if ( is_numeric($metaID) ){
+      if ( is_numeric( $metaid ) ) {
 
-        $return['name'] = get_the_title($metaID) ? stripslashes(get_the_title($metaID)) : __('(No Title)', 'pl-platform');
+        $return['name'] = get_the_title( $metaid ) ? stripslashes( get_the_title( $metaid ) ) : __( '(No Title)', 'pl-platform' );
 
-        if( get_option('show_on_front') == 'page' && get_option( 'page_on_front' ) == $metaID ){
+        if ( get_option( 'show_on_front' ) == 'page' && get_option( 'page_on_front' ) == $metaid ) {
 
           $return['url'] = home_url();
-          $return['name'] = sprintf(__('Home Page', 'pl-platform') );
+          $return['name'] = sprintf( __( 'Home Page', 'pl-platform' ) );
 
         }
       }
-    }
+    } /** ALL Archive Page Types... */
+    elseif ( 'archive' == $groupid ) {
 
-    /** ALL Archive Page Types... */
-    elseif( $groupID == 'archive' ){
+      if ( 'post' == $typeid ) {
+        $return['name'] = pl_ui_key( $metaid ); }
 
-      if( $typeID == 'post' )
-        $return['name'] = pl_ui_key( $metaID );
+      if ( 'blog' == $metaid ) {
 
-      
-      if( $metaID == 'blog' ){
+        if ( get_option( 'show_on_front' ) == 'page' && get_option( 'page_for_posts' ) ) {
+          $return['url'] = get_permalink( get_option( 'page_for_posts' ) );
+        } else {           $return['url'] = home_url(); }
+      } elseif ( 'date' == $metaid ) {
 
-        if ( get_option('show_on_front') == 'page' && get_option('page_for_posts') ){
-          $return['url'] = get_permalink( get_option( 'page_for_posts' ) );   
-        } else 
-          $return['url'] = home_url();
+        $return['url'] = home_url( '?m=' . date( 'Y' ) );
 
-      }
+      } elseif ( 'search' == $metaid ) {
 
-      elseif( $metaID == 'date' ){
+        $return['url'] = home_url( '?s=and' );
 
-        $return['url'] = home_url( '?m=' . date('Y') );
-
-      } 
-
-      elseif( $metaID == 'search' ){
-
-        $return['url'] = home_url('?s=and');
-
-      }
-
-      elseif( $metaID == 'category' ){
+      } elseif ( 'category' == $metaid ) {
 
         /* Specific Category ID provided */
-        if ( isset($termID) && is_numeric($termID) ) {
+        if ( isset( $termid ) && is_numeric( $termid ) ) {
 
-          $term = get_term( $termID, 'category' );
+          $term = get_term( $termid, 'category' );
 
           $return['name'] = ( $term->name ) ? stripslashes( $term->name ) : '(No Title)';
-          
-          $return['url'] = home_url( '?cat=' . $termID );
 
-        } 
-      }
+          $return['url'] = home_url( '?cat=' . $termid );
 
-      elseif( $metaID == 'author' ){
-
+        }
+      } elseif ( 'author' == $metaid ) {
 
         /* Author ID Provided */
-        if ( isset($termID) && is_numeric($termID) ) {
+        if ( isset( $termid ) && is_numeric( $termid ) ) {
 
-          $user_data = get_userdata( $termID );
+          $user_data = get_userdata( $termid );
 
-          $return['name'] = stripslashes($user_data->display_name);
+          $return['name'] = stripslashes( $user_data->display_name );
 
-        
-        } 
-        
-        
-        else {
+        } else {
 
-        
           $current_user = wp_get_current_user();
-          $termID = $current_user->ID;
+          $termid = $current_user->ID;
 
         }
 
-        $return['url'] = home_url('?author=' . $termID);
+        $return['url'] = home_url( '?author=' . $termid );
 
-      }
+      } elseif ( is_object( get_post_type_object( $typeid ) ) ) {
 
-      elseif( is_object(get_post_type_object( $typeID )) ){
+        $pt = get_post_type_object( $typeid );
 
-        $PT = get_post_type_object( $typeID );
+        $return['name'] = $pt->labels->name;
 
-        $return['name'] = $PT->labels->name;
+        $return['url']  = get_post_type_archive_link( $typeid );
 
-        $return['url']  = get_post_type_archive_link( $typeID );
+        if ( ! empty( $metaid ) && false !== strpos( $metaid, 'search' ) ) {
 
-        if ( ! empty( $metaID ) && false !== strpos( $metaID, 'search' ) ){
+          $return['name'] = __( 'Search: ', 'pl-platform' ) . $return['name'];
 
-          $return['name'] = __('Search: ', 'pl-platform') . $return['name'];
+          $return['url'] = $return['url'] . '?s=and&post_type='.$typeid;
 
-          $return['url'] = $return['url'] . '?s=and&post_type='.$typeID;
+        } elseif ( ! empty( $termid ) && is_numeric( $termid ) ) {
 
+          $term = get_term( $termid, $metaid );
+
+          $return['name'] = $term->name;
+
+          $return['url'] = get_term_link( $termid, $metaid );
+
+        }
+      } elseif ( 'taxonomy' == $typeid || 'post_tag' == $metaid || 'post_format' == $metaid ) {
+
+        if ( 'taxonomy' == $typeid ) {
+
+          $return['name'] = pl_ui_key( $typeid );
+
+          $return['type'] = $metaid;
 
         }
 
-        elseif ( ! empty( $termID ) && is_numeric( $termID ) ){
+        if ( '' != $metaid ) {
 
-          $term = get_term( $termID, $metaID );
-        
-          $return['name'] =  $term->name;
-
-          $return['url'] = get_term_link( $termID, $metaID );
-
-        }
-
-      }
-
-      elseif( $typeID == 'taxonomy' || $metaID == 'post_tag' || $metaID == 'post_format' ){
-
-      
-        if( $typeID == 'taxonomy' ){
-
-          $return['name'] = pl_ui_key( $typeID );
-
-          $return['type'] = $metaID;
-
-        }
-
-        if( $metaID != '' ){
-
-          $taxonomy       = get_taxonomy( $metaID );
+          $taxonomy       = get_taxonomy( $metaid );
           $return['name'] = ( $taxonomy->labels->singular_name ) ? stripslashes( $taxonomy->labels->singular_name ) : '(No Title)';
 
         }
 
-
         /* Term Provided */
-        if ( ! empty( $termID ) ) {
+        if ( ! empty( $termid ) ) {
 
-          if( is_numeric( $termID ) ){
-            $termID = (int) $termID;
+          if ( is_numeric( $termid ) ) {
+            $termid = (int) $termid;
           }
 
-          $term = get_term( $termID, $metaID );
+          $term = get_term( $termid, $metaid );
 
-
-          
-          $return = array( 
-            'url'     => get_term_link( $termID, $metaID ), 
-            'name'    => isset( $term->name ) ? $term->name : '(No Title)', 
-            'type'    => $typeID 
+          $return = array(
+            'url'     => get_term_link( $termid, $metaid ),
+            'name'    => isset( $term->name ) ? $term->name : '(No Title)',
+            'type'    => $typeid,
           );
 
-        } 
+        }
       }
-    }
-
-    elseif( $typeID == 'four04' ){
+    } elseif ( 'four04' == $typeid ) {
 
       $return['name'] = '404 Error Page';
-      $return['url'] = home_url('set404-' . rand(100, 99999));
+      $return['url'] = home_url( 'set404-' . mt_rand( 100, 99999 ) );
 
     }
 
-
-    
     $return = wp_parse_args( $return, $defaults );
 
-    return ($item != 'all') ? $return[ $item ] : $return;
+    return ( 'all' != $item ) ? $return[ $item ] : $return;
 
   }
 }
@@ -758,39 +634,39 @@ class PL_Page {
 /**
  * Gets the slug for the page type
  */
-function pl_page_type(){
-  global $pl_page; 
-  return $pl_page->type; 
+function pl_page_type() {
+  global $pl_page;
+  return $pl_page->type;
 }
 
-function pl_current_page_name(){
-  global $pl_page; 
-  return $pl_page->get_current_page_name(); 
+function pl_current_page_name() {
+  global $pl_page;
+  return $pl_page->get_current_page_name();
 }
 
 
 
-function pl_current_page_id(){
-  global $pl_page; 
-  return $pl_page->id; 
+function pl_current_page_id() {
+  global $pl_page;
+  return $pl_page->id;
 }
 
-function pl_current_type_id(){
-  global $pl_page; 
-  return $pl_page->typeid; 
+function pl_current_type_id() {
+  global $pl_page;
+  return $pl_page->typeid;
 }
 
-function pl_edit_id(){
-  global $pl_page; 
-  return $pl_page->get_edit_id(); 
+function pl_edit_id() {
+  global $pl_page;
+  return $pl_page->get_edit_id();
 }
 
-function pl_edit_slug(){
-  global $pl_page; 
-  return $pl_page->get_edit_slug(); 
+function pl_edit_slug() {
+  global $pl_page;
+  return $pl_page->get_edit_slug();
 }
 
-function pl_template_mode(){
-  global $pl_page; 
-  return $pl_page->template_mode(); 
+function pl_template_mode() {
+  global $pl_page;
+  return $pl_page->template_mode();
 }

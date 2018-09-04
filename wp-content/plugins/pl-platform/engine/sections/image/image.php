@@ -5,28 +5,28 @@
   Description:   Simple image section
 
   Author:       PageLines
-  Author URI:   http://www.pagelines.com
+  Author URI:   https://www.pagelines.com
 
   PageLines:     PL_Image_Section
   Filter:       basic
 
 */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 class PL_Image_Section extends PL_Section {
 
-  function section_opts(){
+  function section_opts() {
     $opts = array(
       array(
         'type'      => 'image_upload',
         'key'       => 'image',
-        'label'     => __( 'Image', 'pl-platform' ), 
-        'default'   => pl_fallback_image()
+        'label'     => __( 'Image', 'pl-platform' ),
+        'default'   => pl_fallback_image(),
       ),
       array(
         'type'      => 'text',
         'key'       => 'alt',
-        'label'     => __( 'Alt Text', 'pl-platform' )
+        'label'     => __( 'Alt Text', 'pl-platform' ),
       ),
       array(
         'type'      => 'dragger',
@@ -37,32 +37,32 @@ class PL_Image_Section extends PL_Section {
             'min'     => 0,
             'max'     => 100,
             'default' => 20,
-            'unit'    => __( 'Height (vw)', 'pl-platform' )
+            'unit'    => __( 'Height (vw)', 'pl-platform' ),
           ),
           array(
             'key'     => 'width',
             'min'     => 0,
             'max'     => 100,
-            'unit'    => __( 'Width (vw)', 'pl-platform' )
-          )
-        )
-      ), 
+            'unit'    => __( 'Width (vw)', 'pl-platform' ),
+          ),
+        ),
+      ),
       array(
         'type'      => 'text',
         'key'       => 'link',
-        'label'     => __( 'Link URL', 'pl-platform' )
+        'label'     => __( 'Link URL', 'pl-platform' ),
       ),
       array(
         'type'      => 'check',
         'key'       => 'newwindow',
-        'label'     => __( 'Open in new window?', 'pl-platform' )
+        'label'     => __( 'Open in new window?', 'pl-platform' ),
       ),
-    ); 
+    );
 
     return $opts;
   }
-  
-  function section_template( ) {
+
+  function section_template() {
     $image = $this->opt( 'image', pl_fallback_image() );
     $class = ( ! $this->opt( 'link' ) ) ? 'pl-img' : '';
     ?>
@@ -72,5 +72,5 @@ class PL_Image_Section extends PL_Section {
     </a>
   </div>
 <?php
-   }
+  }
 }

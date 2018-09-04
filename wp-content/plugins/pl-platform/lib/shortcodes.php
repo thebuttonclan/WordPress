@@ -8,8 +8,8 @@
 * @category  Class
 * @author    PageLines
 */
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-
+if ( ! defined( 'ABSPATH' ) ) { exit; // Exit if accessed directly
+}
 
 $GLOBALS['pl_shortcode_engine'] = new PL_Shortcodes_Engine;
 
@@ -23,16 +23,15 @@ class PL_Shortcodes_Engine {
 
   function __construct() {
 
-
     //$this->slug = 'pl-shortcodes';
 
     /** Add the Shortcodes...  */
-    add_action( 'wp', array( $this, 'create_shortcodes_array') );
+    add_action( 'wp', array( $this, 'create_shortcodes_array' ) );
 
-    add_action( 'wp_footer',    array( $this, 'print_shortcode_styles') );
-    add_action( 'wp_footer',  array( $this, 'print_shortcode_scripts') );
+    add_action( 'wp_footer',  array( $this, 'print_shortcode_styles' ) );
+    add_action( 'wp_footer',  array( $this, 'print_shortcode_scripts' ) );
 
-    add_action( 'admin_init', array( $this, 'create_shortcodes_array') );
+    add_action( 'admin_init', array( $this, 'create_shortcodes_array' ) );
 
     /** Tools for adding shortcodes */
     if ( $this->is_edit_post() ) {
@@ -41,19 +40,18 @@ class PL_Shortcodes_Engine {
 
       add_action( 'admin_footer', array( $this, 'pl_shortcodes_iframe' ) );
 
-      add_filter( 'pl_admin_json', array( $this, 'json') );
-
+      add_filter( 'pl_admin_json', array( $this, 'json' ) );
 
     }
 
     /** Keep the paragraph and break tags away */
-    add_filter('the_content', array( $this, 'pl_shortcodes_fix') );
+    add_filter( 'the_content', array( $this, 'pl_shortcodes_fix' ) );
 
   }
 
-  function print_shortcode_scripts(){
+  function print_shortcode_scripts() {
 
-    foreach( $this->scripts as $script ){
+    foreach ( $this->scripts as $script ) {
       echo $script;
     }
 
@@ -61,71 +59,76 @@ class PL_Shortcodes_Engine {
 
   function print_shortcode_styles() {
 
-    if( ! empty( $this->styles ) ) {
-      
+    if ( ! empty( $this->styles ) ) {
+
       $out = '';
 
-      foreach( $this->styles as $style ) {
-        if( '' != $style ) {
+      foreach ( $this->styles as $style ) {
+        if ( '' != $style ) {
           $out .= $style;
         }
       }
-      
-      if( $out ) {
+
+      if ( $out ) {
         printf( '<style class="pl-shortcode-styles">%s</style>', $out );
       }
     }
   }
 
-  function is_edit_post(){
+  function is_edit_post() {
 
     global $pagenow;
 
     // Only run on add/edit screens
-    if ( in_array( $pagenow, array('post.php', 'page.php', 'post-new.php', 'post-edit.php') ) )
-      return true;
-    else
-      return false;
+    if ( in_array( $pagenow, array( 'post.php', 'page.php', 'post-new.php', 'post-edit.php' ) ) ) {
+      return true; } else {       return false; }
 
   }
 
-  function create_shortcodes_array(){
+  function create_shortcodes_array() {
+
+    $defaults = array(
+      'title' => '',
+      'icon'  => '',
+      'settings' => '',
+      'filter'   => '',
+    );
 
     $this->shortcodes_options = array();
 
-    if( isset($this->shortcodes) && is_array($this->shortcodes) && ! empty($this->shortcodes)){
+    if ( isset( $this->shortcodes ) && is_array( $this->shortcodes ) && ! empty( $this->shortcodes ) ) {
 
-      foreach( $this->shortcodes as $sc_slug => $sc ){
+      foreach ( $this->shortcodes as $sc_slug => $sc ) {
 
-        $options = $sc->options();
+        $options = wp_parse_args( $sc->options(), $defaults );
 
-        if( 'system' != $options['filter'] ){
-          $this->shortcodes_options[$sc_slug] = ( method_exists( $sc, 'options' ) ) ? $sc->options() : array();
+        if ( 'system' != $options['filter'] ) {
+          $this->shortcodes_options[ $sc_slug ] = ( method_exists( $sc, 'options' ) ) ? $sc->options() : array();
 
         }
 
-        add_shortcode( $sc_slug, array( $sc, 'shortcode') );
+        $sc->slug = $sc_slug;
+
+        add_shortcode( $sc_slug, array( $sc, 'shortcode' ) );
 
       }
-
     }
-
 
   }
 
   function json( $array ) {
-    
+
     global $plfactory;
     // add shortcodes into JSON
     $array['shortcodes'] = $this->shortcodes_options;
-    
+
     // loops through available sections
     // if they have system filter set in header do NOT allow them to be shortcodes.
-    foreach( $array['sections'] as $k => $section ) {
+    foreach ( $array['sections'] as $k => $section ) {
       $s = $plfactory->factory[ $section ];
       $filter = $s->settings['filter'];
-      if( false !== strpos( $filter, 'system' ) ) {
-        unset( $array['sections'][$k] );
+      if ( false !== strpos( $filter, 'system' ) ) {
+        unset( $array['sections'][ $k ] );
       }
     }
     return $array;
@@ -146,7 +149,6 @@ class PL_Shortcodes_Engine {
 
   function pl_shortcodes_iframe() {
 
-
     ?><div id="pl-select-shortcode" style="display: none;">
 
     <div class="plsc">
@@ -165,15 +167,33 @@ class PL_Shortcodes_Engine {
         <div class="plsc-drawer plsc-workarea fix">
           <?php
 
-          foreach( $this->shortcodes_options as $id => $shortcode ) {
+          foreach ( $this->shortcodes_options as $id => $shortcode ) {
 
-            $icon = (isset($shortcode['icon'])) ? $shortcode['icon'] : 'pencil';
+            $icon = ( isset( $shortcode['icon'] ) ) ? $shortcode['icon'] : 'pencil';
 
-            $shortcode_item = sprintf('<div class="plsc-item"><a class="btn-add-shortcode" href="#" id="%s" data-key="%s"><i class="pl-icon pl-icon-%s"></i> %s</a></div> ',
-              $id,
-              $id,
-              $icon,
-              $shortcode['title']
+            // add pro/free badge if the shortcode has a priv setting
+            if ( isset( $shortcode['priv'] ) && '' != $shortcode['priv'] ) {
+              $proclass = ( pl_is_professional() ) ? 'pro' : 'free';
+              $badge = sprintf( '<div class="pl-badge-pro %s">%s</div>',
+                  $proclass,
+                  '<i class="pl-icon pl-icon-remove"></i><i class="pl-icon pl-icon-check"></i> Pro'
+              );
+            } else {
+              $badge = '';
+              $proclass = '';
+            }
+
+            $desc = esc_attr( $shortcode['desc'] );
+
+            $shortcode_item = sprintf('<div class="plsc-item"><a alt="%s" title="%s" class="btn-add-shortcode %s" href="#" id="%s" data-key="%s"><i class="pl-icon pl-icon-%s"></i> %s%s</a></div> ',
+                $desc,
+                $desc,
+                $proclass,
+                $id,
+                $id,
+                $icon,
+                $shortcode['title'],
+                $badge
             );
             echo $shortcode_item;
           } ?>
@@ -191,17 +211,16 @@ class PL_Shortcodes_Engine {
   /**
    * Fixes <br> & <p> tag spacing added by wpautop WordPress formatting
    */
-  function pl_shortcodes_fix($content){
-      $array = array (
+  function pl_shortcodes_fix( $content ) {
+      $array = array(
           '<p>[' => '[',
           ']</p>' => ']',
-          ']<br />' => ']'
+          ']<br />' => ']',
       );
 
-      $content = strtr($content, $array);
+      $content = strtr( $content, $array );
       return $content;
   }
-
 }
 
 /**
@@ -213,36 +232,55 @@ class PL_Shortcodes_Engine {
  */
 class PL_Shortcode {
 
-  function __construct(){ }
-  
+  function __construct() {
+    // add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+  }
+
+  function enqueue_scripts(){}
+
   /**
    * Main shortcode function, each shorcode will override
    */
-  function shortcode( $atts, $content ){
+  function shortcode( $atts, $content ) {
 
     global $pl_shortcode_engine;
     global $post;
 
-
-    if( ! isset( $atts['post_id'] ) ){
-
-      $atts['post_id'] = ( isset($post) ) ? $post->ID : false;
-      
+    if ( ! is_array( $atts ) ) {
+      $atts = array();
     }
-    
+
+    if ( ! isset( $atts['post_id'] ) ) {
+
+      $atts['post_id'] = ( isset( $post ) ) ? $post->ID : false;
+
+    }
 
     $pl_shortcode_engine->scripts[ get_class( $this ) ] = $this->scripts();
 
     $pl_shortcode_engine->styles[ get_class( $this ) ] = $this->styles();
 
-    return $this->template( $atts, $content );
+    $opts = $this->options();
+
+    $this->enqueue_scripts();
+
+    // if has priv set to pro and user is NOT pro then do not register the shortcode.
+    if ( isset( $opts['priv'] ) && 'pro' == $opts['priv'] && ! pl_is_professional() ) {
+      // this is a pro shortcode and user is not pro..
+      // TODO add an alert? or not?
+
+    } // just show shortcode.
+    else {
+
+      return $this->template( $atts, $content );
+    }
 
   }
-  
+
   /**
    * Template for the shortcode
    */
-  function template( $atts, $content ) { 
+  function template( $atts, $content ) {
     return '';
   }
 
@@ -253,7 +291,7 @@ class PL_Shortcode {
   function scripts() {
     return '';
   }
-  
+
   function styles() {
     return '';
   }
@@ -262,7 +300,7 @@ class PL_Shortcode {
 /**
  * Utility function for adding new shortcodes
  */
-function pl_add_shortcode( $slug, $object ){
+function pl_add_shortcode( $slug, $object ) {
 
   global $pl_shortcode_engine;
 
@@ -273,7 +311,7 @@ function pl_add_shortcode( $slug, $object ){
 
 class PLSC_Section extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'PageLines Section',
       'icon'        => 'random',
@@ -284,43 +322,40 @@ class PLSC_Section extends PL_Shortcode{
 
           'type'    => 'select_section',
           'label'   => 'Section ID',
-          'desc'    => 'Select the ID of section you want.'
+          'desc'    => 'Select the ID of section you want.',
         ),
         'id' => array(
 
           'type'    => 'text',
           'label'   => 'Unique ID',
           'place'   => 'my_unique_id',
-          'default' => rand(),
-          'desc'    => 'Add a unique section ID. Can be any combination of numbers and letters. <strong>Tip!</strong> Reference the same section data across pages by using the same ID.'
+          'default' => mt_rand(),
+          'desc'    => 'Add a unique section ID. Can be any combination of numbers and letters. <strong>Tip!</strong> Reference the same section data across pages by using the same ID.',
         ),
-      )
+      ),
     );
 
     return $opts;
   }
-  
+
   /**
    * Template for the shortcode
    */
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
 
       extract(shortcode_atts(array(
-        'section'     => 'content',
-        'id'          => ( isset($atts['section']) ) ? $atts['section'] . pl_edit_id() : false,
-        'settings'    => array(),
+          'section'     => 'content',
+          'id'          => ( isset( $atts['section'] ) ) ? $atts['section'] . pl_edit_id() : false,
+          'settings'    => array(),
       ), $atts));
-
 
       global $plfactory;
 
-      if( ! isset( $plfactory->section_ids[ $section ] ) ){
+      if ( ! isset( $plfactory->section_ids[ $section ] ) ) {
 
           pl_missing_section( $section );
           return;
-      }
-
-      else {
+      } else {
           $object = $plfactory->section_ids[ $section ];
       }
 
@@ -335,22 +370,22 @@ class PLSC_Section extends PL_Shortcode{
       /** Allow for a function that can be used to set defaults */
       $settings = get_section_data( $s );
 
-      $plfactory->add_section_to_factory( $id, $object, $settings);
+      $plfactory->add_section_to_factory( $id, $object, $settings );
 
       $s->meta['set'] = $settings;
 
       ob_start();
 
+      $s->section_head();
+
       $s->section_styles();
 
-
       /** Auto load build.css document which is generated from build.less */
-      if( is_file( $s->base_dir . '/build.css' ) )
-          pl_style( $section, $s->base_url . '/build.css' );
+      if ( is_file( $s->base_dir . '/build.css' ) ) {
+          pl_style( $section, $s->base_url . '/build.css' ); }
 
-      if( is_file( $s->base_dir . '/style.css' ) )
-          pl_style( $section, $s->base_url . '/style.css' );
-
+      if ( is_file( $s->base_dir . '/style.css' ) ) {
+          pl_style( $section, $s->base_url . '/style.css' ); }
 
       echo '<div class="temp-wrap pl-sn-shortcode" data-bind="stopBinding: true" >';
 
@@ -361,7 +396,7 @@ class PLSC_Section extends PL_Shortcode{
       wp_reset_postdata(); // Reset $post data
       wp_reset_query(); // Reset wp_query
 
-      return apply_filters( 'pl_section', ob_get_clean(), $atts, $content  );
+      return apply_filters( 'pl_section', ob_get_clean(), $atts, $content );
   }
 }
 
@@ -370,7 +405,7 @@ pl_add_shortcode( 'pl_section', new PLSC_Section );
 
 class PL_FB_Like extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Facebook Like',
       'icon'        => 'facebook',
@@ -381,32 +416,32 @@ class PL_FB_Like extends PL_Shortcode{
           'place'   => 'http://www.facebook.com/pagelines',
           'type'    => 'text',
           'label'   => 'Like URL',
-          'desc'    => 'Defaults to your facebook page based on username.'
+          'desc'    => 'Defaults to your facebook page based on username.',
         ),
-      )
+      ),
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
 
       global $post;
 
       extract(shortcode_atts(array(
-        'url'     => pl_get_current_url( false ),
+          'url'     => pl_get_current_url( false ),
       ), $atts));
 
-      $out = sprintf('<div class="fb-like" data-href="%s" data-layout="button_count" data-action="like" data-show-faces="false" data-share="false"></div>', $url );
+      $out = sprintf( '<div class="fb-like" data-href="%s" data-layout="button_count" data-action="like" data-show-faces="false" data-share="false"></div>', $url );
 
       return $out;
   }
 
-  function styles(){
+  function styles() {
     return '.fb-like{vertical-align: top; line-height: 20px; margin-right: .5em;}';
   }
 
-  function scripts(){
+  function scripts() {
 
       ob_start(); ?>
 
@@ -422,15 +457,13 @@ class PL_FB_Like extends PL_Shortcode{
 <?php
       return ob_get_clean();
   }
-
-
 }
 
 pl_add_shortcode( 'pl_facebook_like', new PL_FB_Like );
 
 class PL_Twitter_Follow extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Twitter Follow',
       'icon'        => 'twitter',
@@ -440,42 +473,40 @@ class PL_Twitter_Follow extends PL_Shortcode{
         'username' => array(
           'place'   => 'pagelines',
           'type'    => 'text',
-          'label'   => 'Twitter Username'
+          'label'   => 'Twitter Username',
         ),
-      )
+      ),
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
 
       extract(shortcode_atts(array(
-        'username' => pl_user_setting('username_twitter', 'pagelines'),
+          'username' => pl_user_setting( 'username_twitter', 'pagelines' ),
       ), $atts));
 
       $out = sprintf('<a href="http://www.twitter.com/%s" class="twitter-follow-button" data-show-count="true" data-show-screen-name="false"></a>',
-        $username,
-        $username
+          $username,
+          $username
       );
 
       return $out;
   }
 
-  function styles(){
+  function styles() {
     return '.twitter-follow-button{vertical-align: top; line-height: 20px; margin-right: .5em;}';
   }
 
 
-  function scripts(){
+  function scripts() {
 
       ob_start(); ?>
       <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 <?php
       return ob_get_clean();
   }
-
-
 }
 pl_add_shortcode( 'pl_twitter_follow', new PL_Twitter_Follow );
 
@@ -485,18 +516,18 @@ pl_add_shortcode( 'pl_twitter_follow', new PL_Twitter_Follow );
  */
 class PL_Logo_URL extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
-      'title'       => 'Site Logo Url',
-      'icon'        => 'picture',
+      'title'       => 'Site Logo URL',
+      'icon'        => 'link',
       'desc'        => 'The URL of your site logo',
-      'filter'      => 'images'
+      'filter'      => 'images',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
       return pl_get_site_logo( false );
   }
 }
@@ -508,43 +539,44 @@ pl_add_shortcode( 'pl_logo_url', new PL_Logo_URL );
  */
 class PL_Logo_Img extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Site Logo IMG',
-      'icon'        => 'picture',
+      'icon'        => 'photo',
       'desc'        => 'HTML for Site Logo',
       'filter'      => 'images',
       'settings'    => array(
         'href' => array(
           'place'   => get_bloginfo( 'url' ),
           'type'    => 'text',
-          'label'   => 'Image Link'
+          'label'   => 'Image Link',
         ),
         'title' => array(
           'place'   => get_bloginfo( 'name' ),
           'type'    => 'text',
-          'label'   => 'Image Alt Text'
+          'label'   => 'Image Alt Text',
         ),
-    ) );
+      ),
+    );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
-    
+  function template( $atts, $content ) {
+
     $defaults = array(
       'href'  => get_bloginfo( 'uri' ),
       'title' => get_bloginfo( 'name' ),
       'target'  => '_parent',
     );
     $atts = wp_parse_args( $atts, $defaults );
-    
+
     return sprintf( '<a target="%s" href="%s"><img title="%s" src="%s" /></a>',
-      $atts['target'],
-      $atts['href'],
-      $atts['title'],
-      pl_get_site_logo( false )
-     );
+        $atts['target'],
+        $atts['href'],
+        $atts['title'],
+        pl_get_site_logo( false )
+    );
   }
 }
 
@@ -556,34 +588,34 @@ pl_add_shortcode( 'pl_logo_img', new PL_Logo_Img );
  */
 class PL_Post_Time extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Post Time',
       'icon'        => 'circle-o',
       'desc'        => 'The time the post was created',
-      'filter'      => 'posts'
+      'filter'      => 'posts',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
 
       $defaults = array(
         'format'  => get_option( 'time_format' ),
         'before'  => '',
         'after'   => '',
-        'label'   => ''
+        'label'   => '',
       );
       $atts = wp_parse_args( $atts, $defaults );
 
       $output = sprintf( '<time class="time published sc" datetime="%5$s">%1$s%3$s%4$s%2$s</time> ',
-              $atts['before'],
-              $atts['after'],
-              $atts['label'],
-              get_the_time( $atts['format'],  $atts['post_id'] ),
-              get_the_time( 'Y-m-d\TH:i:sO',  $atts['post_id'] )
-            );
+          $atts['before'],
+          $atts['after'],
+          $atts['label'],
+          get_the_time( $atts['format'],  $atts['post_id'] ),
+          get_the_time( 'Y-m-d\TH:i:sO',  $atts['post_id'] )
+      );
 
       return apply_filters( 'plsc_post_time', $output, $atts );
 
@@ -597,34 +629,34 @@ pl_add_shortcode( 'post_time', new PL_Post_Time );
  */
 class PL_Post_Date extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Post Date',
       'icon'        => 'circle-o',
       'desc'        => 'The date the post was created',
-      'filter'      => 'posts'
+      'filter'      => 'posts',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
       $defaults = array(
         'format'  => get_option( 'date_format' ),
         'before'  => '',
         'after'   => '',
-        'label'   => ''
+        'label'   => '',
       );
 
       $atts = wp_parse_args( $atts, $defaults );
 
       $output = sprintf( '<time class="date time published updated sc" datetime="%5$s">%1$s%3$s%4$s%2$s</time> ',
-              $atts['before'],
-              $atts['after'],
-              $atts['label'],
-              get_the_time( $atts['format'], $atts['post_id'] ),
-              get_the_time( 'c', $atts['post_id'] ) 
-            );
+          $atts['before'],
+          $atts['after'],
+          $atts['label'],
+          get_the_time( $atts['format'], $atts['post_id'] ),
+          get_the_time( 'c', $atts['post_id'] )
+      );
 
       return apply_filters( 'plsc_post_date', $output, $atts );
   }
@@ -637,22 +669,22 @@ pl_add_shortcode( 'post_date', new PL_Post_Date );
  */
 class PL_Post_Categories extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Post Categories',
       'icon'        => 'circle-o',
       'desc'        => 'The categories assigned to the post.',
-      'filter'      => 'posts'
+      'filter'      => 'posts',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
     $defaults = array(
       'sep' => ', ',
       'before' => '',
-      'after' => ''
+      'after' => '',
     );
 
     $atts = wp_parse_args( $atts, $defaults );
@@ -672,28 +704,28 @@ pl_add_shortcode( 'post_categories', new PL_Post_Categories );
  */
 class PL_Post_Tags extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Post Tags',
       'icon'        => 'circle-o',
       'desc'        => 'The tags assigned to the post.',
-      'filter'      => 'posts'
+      'filter'      => 'posts',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
     $defaults = array(
       'sep' => ', ',
       'before' => __( 'Tagged With: ', 'pl-platform' ),
-      'after' => ''
+      'after' => '',
     );
     $atts = shortcode_atts( $defaults, $atts );
 
     $tags = get_the_tag_list( $atts['before'], trim( $atts['sep'] ) . ' ', $atts['after'] );
 
-    if ( !$tags ) return;
+    if ( ! $tags ) { return; }
 
     $output = sprintf( '<span class="tags sc">%s</span> ', $tags );
 
@@ -708,32 +740,32 @@ pl_add_shortcode( 'post_tags', new PL_Post_Tags );
  */
 class PL_Post_Comments extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Post Comments Link',
       'icon'        => 'circle-o',
       'desc'        => 'The comments info link for the post.',
-      'filter'      => 'posts'
+      'filter'      => 'posts',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
 
     $defaults = array(
-      'zero'    => __( "Add Comment", 'pl-platform' ),
-      'one'     => __( "1 Comment",   'pl-platform' ),
-      'more'    => __( "% Comments",  'pl-platform' ),
+      'zero'    => __( 'Add Comment', 'pl-platform' ),
+      'one'     => __( '1 Comment',   'pl-platform' ),
+      'more'    => __( '% Comments',  'pl-platform' ),
       'hide_if_off' => 'disabled',
       'before'  => '',
       'after'   => '',
-      'output'  => 'span'
+      'output'  => 'span',
     );
     $atts = wp_parse_args( $atts, $defaults );
 
-    if ( ( !comments_open() ) && $atts['hide_if_off'] === 'enabled' )
-      return;
+    if ( ( ! comments_open() ) && 'enabled' === $atts['hide_if_off'] ) {
+      return; }
 
     // Prevent automatic WP Output
     ob_start();
@@ -742,10 +774,8 @@ class PL_Post_Comments extends PL_Shortcode{
 
     $comments = sprintf( '<a href="%s#comments">%s</a>', get_permalink(), $comments );
 
-    if( $atts['output'] == 'link')
-      $output = $comments;
-    else
-      $output = sprintf( '<span class="post-comments sc">%2$s%1$s%3$s</span>', $comments, $atts['before'], $atts['after'] );
+    if ( 'link' == $atts['output'] ) {
+      $output = $comments; } else {       $output = sprintf( '<span class="post-comments sc">%2$s%1$s%3$s</span>', $comments, $atts['before'], $atts['after'] ); }
 
     return apply_filters( 'plsc_post_comments', $output, $atts );
 
@@ -759,23 +789,23 @@ pl_add_shortcode( 'post_comments', new PL_Post_Comments );
  */
 class PL_Post_Edit_Link extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
-      'title'       => 'Post Edit Link',
+      'title'       => __( 'Post Edit Link', 'pl-platform' ),
       'icon'        => 'circle-o',
-      'desc'        => 'Gets a post edit link for the post.',
-      'filter'      => 'posts'
+      'desc'        => __( 'Gets a post edit link for the post.', 'pl-platform' ),
+      'filter'      => 'posts',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
 
     $defaults = array(
-      'link' => __( "<span class='editpage sc'>Edit</span>", 'pl-platform' ),
-      'before' => '[',
-      'after' => ']'
+      'link' => sprintf( "<span class='editpage sc'>(%s)</span>", __( 'Edit', 'pl-platform' ) ),
+      'before' => '',
+      'after' => '',
     );
     $atts = wp_parse_args( $atts, $defaults );
 
@@ -798,23 +828,23 @@ pl_add_shortcode( 'post_edit', new PL_Post_Edit_Link );
  */
 class PL_Post_Author extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Post Author Link',
       'icon'        => 'circle-o',
       'desc'        => 'Gets a post author link for the post.',
-      'filter'      => 'posts'
+      'filter'      => 'posts',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
 
     $defaults = array(
       'before' => '',
       'after' => '',
-      'class' => ''
+      'class' => '',
     );
     $atts = wp_parse_args( $atts, $defaults );
 
@@ -837,18 +867,18 @@ pl_add_shortcode( 'post_author', new PL_Post_Author );
  */
 class PLSC_Child_URL extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Child Theme URL',
       'icon'        => 'file',
       'desc'        => 'The URL for the child theme or parent theme if none is active.',
-      'filter'      => 'system'
+      'filter'      => 'system',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
     return get_stylesheet_directory_uri();
   }
 }
@@ -860,19 +890,19 @@ pl_add_shortcode( 'pl_child_url', new PLSC_Child_URL );
  */
 class PLSC_Parent_URL extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Parent Theme URL',
       'icon'        => 'file',
       'desc'        => 'The URL for the parent theme.',
-      'filter'      => 'system'
+      'filter'      => 'system',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
-    return pl_get_template_directory_uri();
+  function template( $atts, $content ) {
+    return get_template_directory_uri();
   }
 }
 
@@ -883,18 +913,18 @@ pl_add_shortcode( 'pl_parent_url', new PLSC_Parent_URL );
  */
 class PLSC_Site_URL extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Site URL',
       'icon'        => 'file',
       'desc'        => 'The basic site URL.',
-      'filter'      => 'system'
+      'filter'      => 'system',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
       return site_url();
   }
 }
@@ -906,21 +936,21 @@ pl_add_shortcode( 'pl_site_url', new PLSC_Site_URL );
  */
 class PLSC_Uploads_URL extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Uploads Directory URL',
       'icon'        => 'file',
       'desc'        => 'The basic site Uploads URL.',
-      'filter'      => 'system'
+      'filter'      => 'system',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
-    
+  function template( $atts, $content ) {
+
     $upload_dir = wp_upload_dir();
-    return $upload_dir['baseurl'];
+    return apply_filters( 'pl_uploads_url', $upload_dir['baseurl'] );
   }
 }
 
@@ -932,18 +962,18 @@ pl_add_shortcode( 'pl_uploads_url', new PLSC_Uploads_URL );
  */
 class PLSC_Home_URL extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Home URL',
       'icon'        => 'file',
       'desc'        => 'The basic home URL.',
-      'filter'      => 'system'
+      'filter'      => 'system',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
     return home_url();
   }
 }
@@ -955,18 +985,18 @@ pl_add_shortcode( 'pl_home_url', new PLSC_Home_URL );
  */
 class PLSC_Images_URL extends PL_Shortcode{
 
-  function options(){
+  function options() {
     $opts = array(
       'title'       => 'Framework Images URL',
       'icon'        => 'file',
       'desc'        => 'The site image folder URL.',
-      'filter'      => 'system'
+      'filter'      => 'system',
     );
 
     return $opts;
   }
 
-  function template( $atts, $content ){
+  function template( $atts, $content ) {
     return pl_get_template_directory_uri() . '/ui/images/';
   }
 }

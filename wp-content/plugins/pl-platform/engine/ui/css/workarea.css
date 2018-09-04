@@ -1,7 +1,7 @@
-/* PageLines Platform - 5.0.103
-* Built: Thursday, February 4th, 2016, 18:33
-* http://www.pagelines.com
-* Copyright (c) 2016 PageLines; Licensed GPL-3.0 */
+/* PageLines Platform - 5.1.8
+* Built: Thursday, November 16th, 2017, 18:16
+* https://www.pagelines.com
+* Copyright (c) 2017 PageLines; Licensed GPL-3.0 */
 /* # HTML5 Reset
 ---------------------------------------------------------------------------------------------------- */
 /* ## Baseline Normalize
@@ -608,7 +608,8 @@ button.close {
 }
 .dropzone .dz-preview,
 .dropzone-previews .dz-preview {
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.25);
+  box-shadow: 0px 0 1px rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.04);
 }
 .dropzone .dz-preview.dz-success .dz-success-mark,
 .dropzone-previews .dz-preview.dz-success .dz-success-mark {
@@ -1188,7 +1189,8 @@ h6,
 }
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .richtext-frame {
   width: 100%;
-  border: 1px solid #eee;
+  border: 1px solid #ddd;
+  border-radius: 2px;
 }
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .richtext-textarea {
   display: none;
@@ -1224,6 +1226,15 @@ h6,
 }
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .itemset .item-toggle .pl-icon-caret-down {
   display: none;
+}
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .itemset.item-closed.pl-form-group .item-toggle {
+  padding-top: 3px;
+  padding-bottom: 3px;
+  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .itemset.item-closed.pl-form-group .item-toggle:hover {
+  background-color: rgba(0, 0, 0, 0.07);
 }
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .itemset.item-closed .item-toggle .pl-icon-angle-up {
   display: none;
@@ -1277,6 +1288,14 @@ h6,
   padding: 0;
   margin-bottom: 1em;
 }
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .panel-opts > .pl-form-group > .item-contents > .pl-form-group {
+  margin-bottom: 1.2em 0;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 1.2em;
+}
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .pl-form-group.type-link .pl-badge-pro {
+  margin-top: 7px;
+}
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .pl-form-control {
   background: #fafafa;
   border: 1px solid #ddd;
@@ -1301,9 +1320,20 @@ h6,
   color: #333;
   height: 100px;
 }
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form textarea.pl-form-control.lstn.nowrap {
+  white-space: pre;
+  word-wrap: normal;
+  overflow-x: scroll;
+}
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form select[disabled] {
   border: none;
   -webkit-appearance: none;
+}
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form input[disabled],
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form select[disabled],
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form textarea[disabled],
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form div[disabled] {
+  opacity: 0.5;
 }
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form label {
   display: block;
@@ -1324,6 +1354,15 @@ h6,
 }
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form input.invalid {
   border-color: #FF0039;
+}
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .pageid-current-id span {
+  display: none;
+}
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .pageid-current-id.pl-btn-primary .pl-add {
+  display: inline;
+}
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .pageid-current-id.pl-btn-danger .pl-remove {
+  display: inline;
 }
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .pl-alert {
   font-size: 10px;
@@ -1346,6 +1385,7 @@ h6,
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form input[type="radio"],
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form input[type="checkbox"] {
   margin-top: 1px;
+  margin-right: 6px;
 }
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .pl-btn-radios .pl-btn {
   font-size: 11px;
@@ -1466,6 +1506,11 @@ h6,
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .dd-list .dd-sort .dd-item.item-highlight > .dd-item-wrap {
   box-shadow: 0 0 15px rgba(15, 106, 242, 0.4);
   border-color: rgba(15, 106, 242, 0.3);
+}
+.pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .dd-list .dd-sort .dd-item.hide-on-page {
+  display: block;
+  opacity: .7;
+  z-index: 100;
 }
 .pl-workarea .pl-workarea-sidebar-container .pl-workarea-sidebar .workarea-opts-form .dd-list .dd-sort .dd-item.hide-on-page .dd-title {
   background: #eee;
@@ -1751,14 +1796,14 @@ h6,
 .pl-workarea.pl-has-sidebar .pl-workarea-sidebar-container {
   right: 0;
 }
-/** 
+/**
  * Dropzone Preview when showing larger images on load.
  */
 .dz-preview {
   max-width: 56px;
 }
 .dz-preview img {
-  max-width: 100%;
+  width: 100%;
   display: block;
 }
 /**
