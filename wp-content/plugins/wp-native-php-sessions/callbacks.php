@@ -59,12 +59,6 @@ function _pantheon_session_open() {
  */
 function _pantheon_session_read( $sid ) {
 
-	// Write and Close handlers are called after destructing objects
-	// since PHP 5.0.5.
-	// Thus destructors can use sessions but session handler can't use objects.
-	// So we are moving session closure before destructing objects.
-	register_shutdown_function( 'session_write_close' );
-
 	// Handle the case of first time visitors and clients that don't store
 	// cookies (eg. web crawlers).
 	$insecure_session_name = substr( session_name(), 1 );
@@ -93,7 +87,7 @@ function _pantheon_session_read( $sid ) {
  *
  * @param $sid The session ID of the session to write to.
  * @param $value Session data to write as a serialized string.
- * @return true
+ * @return boolean
  */
 function _pantheon_session_write( $sid, $value ) {
 
@@ -101,6 +95,11 @@ function _pantheon_session_write( $sid, $value ) {
 
 	if ( ! $session ) {
 		$session = \Pantheon_Sessions\Session::create_for_sid( $sid );
+	}
+
+	if ( ! $session ) {
+		trigger_error( 'Could not write session to the database. Please check MySQL configuration.', E_USER_WARNING );
+		return false;
 	}
 
 	$session->set_data( $value );
@@ -124,6 +123,7 @@ function _pantheon_session_destroy( $sid ) {
 
 	$session->destroy();
 
+	return true;
 }
 
 /**
