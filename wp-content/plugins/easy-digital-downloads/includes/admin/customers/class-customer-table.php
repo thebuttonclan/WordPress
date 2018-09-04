@@ -51,6 +51,14 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 	public $total = 0;
 
 	/**
+	 * The arguments for the data set
+	 *
+	 * @var array
+	 * @since  2.6
+	 */
+	public $args = array();
+
+	/**
 	 * Get things started
 	 *
 	 * @since 1.5
@@ -72,7 +80,6 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 	 * Show the search field
 	 *
 	 * @since 1.7
-	 * @access public
 	 *
 	 * @param string $text Label for the search box
 	 * @param string $input_id ID of the search box
@@ -110,7 +117,6 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 	/**
 	 * This function renders most of the columns in the list table.
 	 *
-	 * @access public
 	 * @since 1.5
 	 *
 	 * @param array $item Contains all the data of the customers
@@ -162,14 +168,13 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 	/**
 	 * Retrieve the table columns
 	 *
-	 * @access public
 	 * @since 1.5
 	 * @return array $columns Array of all the list table columns
 	 */
 	public function get_columns() {
 		$columns = array(
 			'name'          => __( 'Name', 'easy-digital-downloads' ),
-			'email'         => __( 'Email', 'easy-digital-downloads' ),
+			'email'         => __( 'Primary Email', 'easy-digital-downloads' ),
 			'num_purchases' => __( 'Purchases', 'easy-digital-downloads' ),
 			'amount_spent'  => __( 'Total Spent', 'easy-digital-downloads' ),
 			'date_created'  => __( 'Date Created', 'easy-digital-downloads' ),
@@ -182,7 +187,6 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 	/**
 	 * Get the sortable columns
 	 *
-	 * @access public
 	 * @since 2.1
 	 * @return array Array of all the sortable columns
 	 */
@@ -198,7 +202,6 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 	/**
 	 * Outputs the reporting views
 	 *
-	 * @access public
 	 * @since 1.5
 	 * @return void
 	 */
@@ -209,7 +212,6 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 	/**
 	 * Retrieve the current page number
 	 *
-	 * @access public
 	 * @since 1.5
 	 * @return int Current page number
 	 */
@@ -220,7 +222,6 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 	/**
 	 * Retrieves the search query string
 	 *
-	 * @access public
 	 * @since 1.7
 	 * @return mixed string If search is present, false otherwise
 	 */
@@ -231,7 +232,6 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 	/**
 	 * Build all the reports data
 	 *
-	 * @access public
 	 * @since 1.5
 	  * @global object $wpdb Used to query the database using the WordPress
 	 *   Database API
@@ -264,7 +264,8 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 			$args['name']  = $search;
 		}
 
-		$customers = EDD()->customers->get_customers( $args );
+		$this->args = $args;
+		$customers  = EDD()->customers->get_customers( $args );
 
 		if ( $customers ) {
 
@@ -290,7 +291,6 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 	/**
 	 * Setup the final data for the table
 	 *
-	 * @access public
 	 * @since 1.5
 	 * @uses EDD_Customer_Reports_Table::get_columns()
 	 * @uses WP_List_Table::get_sortable_columns()
@@ -308,12 +308,16 @@ class EDD_Customer_Reports_Table extends WP_List_Table {
 
 		$this->items = $this->reports_data();
 
-		$this->total = edd_count_total_customers();
+		$this->total = edd_count_total_customers( $this->args );
+
+		// Add condition to be sure we don't divide by zero.
+		// If $this->per_page is 0, then set total pages to 1.
+		$total_pages = $this->per_page ? ceil( (int) $this->total / (int) $this->per_page ) : 1;
 
 		$this->set_pagination_args( array(
 			'total_items' => $this->total,
 			'per_page'    => $this->per_page,
-			'total_pages' => ceil( $this->total / $this->per_page ),
+			'total_pages' => $total_pages,
 		) );
 	}
 }

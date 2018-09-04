@@ -44,7 +44,6 @@ class EDD_Tools_Recount_Single_Customer_Stats extends EDD_Batch_Export {
 	/**
 	 * Get the Export Data
 	 *
-	 * @access public
 	 * @since 2.5
 	 * @global object $wpdb Used to query the database using the WordPress
 	 *   Database API
@@ -111,7 +110,7 @@ class EDD_Tools_Recount_Single_Customer_Stats extends EDD_Batch_Export {
 	 */
 	public function get_percentage_complete() {
 
-		$payments = $this->get_stored_data( 'edd_recount_customer_payments_' . $this->customer_id );
+		$payments = $this->get_stored_data( 'edd_recount_customer_payments_' . $this->customer_id, array() );
 		$total       = count( $payments );
 
 		$percentage = 100;
@@ -156,10 +155,10 @@ class EDD_Tools_Recount_Single_Customer_Stats extends EDD_Batch_Export {
 			return true;
 		} else {
 			$customer         = new EDD_Customer( $this->customer_id );
-			$payment_ids      = get_option( 'edd_stats_found_payments_' . $customer->id, array() );
+			$payment_ids      = $this->get_stored_data( 'edd_stats_found_payments_' . $customer->id, array() );
 			$this->delete_data( 'edd_stats_found_payments_' . $customer->id );
 
-			$removed_payments = array_unique( get_option( 'edd_stats_missing_payments' . $customer->id, array() ) );
+			$removed_payments = array_unique( $this->get_stored_data( 'edd_stats_missing_payments' . $customer->id, array() ) );
 
 			// Find non-existing payments (deleted) and total up the purchase count
 			$purchase_count   = 0;
@@ -194,7 +193,7 @@ class EDD_Tools_Recount_Single_Customer_Stats extends EDD_Batch_Export {
 	public function headers() {
 		ignore_user_abort( true );
 
-		if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+		if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 			set_time_limit( 0 );
 		}
 	}
@@ -202,7 +201,6 @@ class EDD_Tools_Recount_Single_Customer_Stats extends EDD_Batch_Export {
 	/**
 	 * Perform the export
 	 *
-	 * @access public
 	 * @since 2.5
 	 * @return void
 	 */
@@ -217,7 +215,6 @@ class EDD_Tools_Recount_Single_Customer_Stats extends EDD_Batch_Export {
 	/**
 	 * Zero out the data on step one
 	 *
-	 * @access public
 	 * @since 2.5
 	 * @return void
 	 */
@@ -234,7 +231,7 @@ class EDD_Tools_Recount_Single_Customer_Stats extends EDD_Batch_Export {
 			$attached_args = array(
 				'post__in' => $attached_payment_ids,
 				'number'   => -1,
-				'status'   => $allowed_post_status,
+				'status'   => $allowed_payment_status,
 			);
 
 			$attached_payments = edd_get_payments( $attached_args );
@@ -242,7 +239,7 @@ class EDD_Tools_Recount_Single_Customer_Stats extends EDD_Batch_Export {
 			$unattached_args = array(
 				'post__not_in' => $attached_payment_ids,
 				'number'       => -1,
-				'status'       => $allowed_post_status,
+				'status'       => $allowed_payment_status,
 				'meta_query'   => array(
 					array(
 						'key'   => '_edd_payment_user_email',
@@ -266,11 +263,20 @@ class EDD_Tools_Recount_Single_Customer_Stats extends EDD_Batch_Export {
 	 * @param  string $key The option_name
 	 * @return mixed       Returns the data from the database
 	 */
-	private function get_stored_data( $key ) {
+	private function get_stored_data( $key, $default = false ) {
 		global $wpdb;
 		$value = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM $wpdb->options WHERE option_name = '%s'", $key ) );
 
-		return empty( $value ) ? false : maybe_unserialize( $value );
+		if ( empty( $value ) ) {
+			return $default;
+		}
+
+		$maybe_json = json_decode( $value );
+		if ( ! is_null( $maybe_json ) && ! is_numeric( $value ) ) {
+			$value = $maybe_json;
+		}
+
+		return $value;
 	}
 
 	/**
@@ -284,7 +290,7 @@ class EDD_Tools_Recount_Single_Customer_Stats extends EDD_Batch_Export {
 	private function store_data( $key, $value ) {
 		global $wpdb;
 
-		$value = maybe_serialize( $value );
+		$value = is_array( $value ) ? wp_json_encode( $value ) : esc_attr( $value );
 
 		$data = array(
 			'option_name'  => $key,

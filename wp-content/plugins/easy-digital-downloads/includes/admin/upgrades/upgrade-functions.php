@@ -12,6 +12,53 @@
 // Exit if accessed directly
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+
+/**
+ * Perform automatic database upgrades when necessary
+ *
+ * @since 2.6
+ * @return void
+*/
+function edd_do_automatic_upgrades() {
+
+	$did_upgrade = false;
+	$edd_version = preg_replace( '/[^0-9.].*/', '', get_option( 'edd_version' ) );
+
+	if( version_compare( $edd_version, '2.6', '<' ) ) {
+
+		edd_v26_upgrades();
+
+	}
+
+	if( version_compare( $edd_version, EDD_VERSION, '<' ) ) {
+
+		// Let us know that an upgrade has happened
+		$did_upgrade = true;
+
+	}
+
+	if( $did_upgrade ) {
+
+		update_option( 'edd_version', preg_replace( '/[^0-9.].*/', '', EDD_VERSION ) );
+
+		// Send a check in. Note: this only sends if data tracking has been enabled
+		$tracking = new EDD_Tracking;
+		$tracking->send_checkin( false, true );
+	}
+
+	$fix_show_privacy_policy_setting = edd_get_option( 'show_agree_to_privacy_policy_on_checkout', false );
+	if ( ! empty( $fix_show_privacy_policy_setting ) ) {
+
+		edd_update_option( 'show_privacy_policy_on_checkout', $fix_show_privacy_policy_setting );
+
+		edd_delete_option( 'show_agree_to_privacy_policy_on_checkout' );
+
+	}
+
+}
+add_action( 'admin_init', 'edd_do_automatic_upgrades' );
+
+
 /**
  * Display Upgrade Notices
  *
@@ -138,6 +185,13 @@ function edd_show_upgrade_notices() {
 			);
 		}
 
+		if ( version_compare( $edd_version, '2.9.2', '<' ) || ! edd_has_upgrade_completed( 'update_file_download_log_data' ) ) {
+			printf(
+				'<div class="updated"><p>' . __( 'Easy Digital Downloads needs to upgrade the file download logs database, click <a href="%s">here</a> to start the upgrade.', 'easy-digital-downloads' ) . '</p></div>',
+				esc_url( admin_url( 'index.php?page=edd-upgrades&edd-upgrade=update_file_download_log_data' ) )
+			);
+		}
+
 		/*
 		 *  NOTICE:
 		 *
@@ -258,7 +312,7 @@ function edd_v131_upgrades() {
 
 	ignore_user_abort( true );
 
-	if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) )
+	if ( ! edd_is_func_disabled( 'set_time_limit' ) )
 		set_time_limit( 0 );
 
 	$args = array(
@@ -359,12 +413,12 @@ function edd_v14_upgrades() {
 	global $edd_options;
 
 	/** Add [edd_receipt] to success page **/
-	$success_page = get_post( $edd_options['success_page'] );
+	$success_page = get_post( edd_get_option( 'success_page' ) );
 
-	// Check for the [edd_receipt] short code and add it if not present
+	// Check for the [edd_receipt] shortcode and add it if not present
 	if( strpos( $success_page->post_content, '[edd_receipt' ) === false ) {
 		$page_content = $success_page->post_content .= "\n[edd_receipt]";
-		wp_update_post( array( 'ID' => $edd_options['success_page'], 'post_content' => $page_content ) );
+		wp_update_post( array( 'ID' => edd_get_option( 'success_page' ), 'post_content' => $page_content ) );
 	}
 
 	/** Convert Discounts to new Custom Post Type **/
@@ -439,7 +493,7 @@ function edd_v20_upgrades() {
 
 	ignore_user_abort( true );
 
-	if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+	if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 		set_time_limit( 0 );
 	}
 
@@ -485,7 +539,7 @@ function edd_v20_upgrade_sequential_payment_numbers() {
 
 	ignore_user_abort( true );
 
-	if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+	if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 		set_time_limit( 0 );
 	}
 
@@ -567,7 +621,7 @@ function edd_v21_upgrade_customers_db() {
 
 	ignore_user_abort( true );
 
-	if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+	if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 		@set_time_limit(0);
 	}
 
@@ -676,7 +730,7 @@ function edd_v226_upgrade_payments_price_logs_db() {
 		wp_die( __( 'You do not have permission to do shop upgrades', 'easy-digital-downloads' ), __( 'Error', 'easy-digital-downloads' ), array( 'response' => 403 ) );
 	}
 	ignore_user_abort( true );
-	if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+	if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 		@set_time_limit(0);
 	}
 	$step   = isset( $_GET['step'] ) ? absint( $_GET['step'] ) : 1;
@@ -773,7 +827,7 @@ function edd_v23_upgrade_payment_taxes() {
 		wp_die( __( 'You do not have permission to do shop upgrades', 'easy-digital-downloads' ), __( 'Error', 'easy-digital-downloads' ), array( 'response' => 403 ) );
 	}
 	ignore_user_abort( true );
-	if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+	if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 		@set_time_limit(0);
 	}
 
@@ -849,7 +903,7 @@ function edd_v23_upgrade_customer_purchases() {
 
 	ignore_user_abort( true );
 
-	if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+	if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 		@set_time_limit(0);
 	}
 
@@ -977,7 +1031,7 @@ function edd_upgrade_user_api_keys() {
 
 	ignore_user_abort( true );
 
-	if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+	if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 		@set_time_limit(0);
 	}
 
@@ -1062,7 +1116,7 @@ function edd_remove_refunded_sale_logs() {
 
 	ignore_user_abort( true );
 
-	if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+	if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 		@set_time_limit(0);
 	}
 
@@ -1114,3 +1168,127 @@ function edd_remove_refunded_sale_logs() {
 	}
 }
 add_action( 'edd_remove_refunded_sale_logs', 'edd_remove_refunded_sale_logs' );
+
+/**
+ * 2.6 Upgrade routine to create the customer meta table
+ *
+ * @since  2.6
+ * @return void
+ */
+function edd_v26_upgrades() {
+	@EDD()->customers->create_table();
+	@EDD()->customer_meta->create_table();
+}
+
+
+function edd_upgrade_render_update_file_download_log_data() {
+	$migration_complete = edd_has_upgrade_completed( 'update_file_download_log_data' );
+
+	if ( $migration_complete ) : ?>
+		<div id="edd-sl-migration-complete" class="notice notice-success">
+			<p>
+				<?php _e( '<strong>Migration complete:</strong> You have already completed the update to the file download logs.', 'easy-digital-downloads' ); ?>
+			</p>
+		</div>
+		<?php return; ?>
+	<?php endif; ?>
+
+	<div id="edd-migration-ready" class="notice notice-success" style="display: none;">
+		<p>
+			<?php _e( '<strong>Database Upgrade Complete:</strong> All database upgrades have been completed.', 'easy-digital-downloads' ); ?>
+			<br /><br />
+			<?php _e( 'You may now leave this page.', 'easy-digital-downloads' ); ?>
+		</p>
+	</div>
+
+	<div id="edd-migration-nav-warn" class="notice notice-info">
+		<p>
+			<?php _e( '<strong>Important:</strong> Please leave this screen open and do not navigate away until the process completes.', 'easy-digital-downloads' ); ?>
+		</p>
+	</div>
+
+	<style>
+		.dashicons.dashicons-yes { display: none; color: rgb(0, 128, 0); vertical-align: middle; }
+	</style>
+	<script>
+		jQuery( function($) {
+			$(document).ready(function () {
+				$(document).on("DOMNodeInserted", function (e) {
+					var element = e.target;
+
+					if (element.id === 'edd-batch-success') {
+						element = $(element);
+
+						element.parent().prev().find('.edd-migration.allowed').hide();
+						element.parent().prev().find('.edd-migration.unavailable').show();
+						var element_wrapper = element.parents().eq(4);
+						element_wrapper.find('.dashicons.dashicons-yes').show();
+
+						var next_step_wrapper = element_wrapper.next();
+						if (next_step_wrapper.find('.postbox').length) {
+							next_step_wrapper.find('.edd-migration.allowed').show();
+							next_step_wrapper.find('.edd-migration.unavailable').hide();
+
+							if (auto_start_next_step) {
+								next_step_wrapper.find('.edd-export-form').submit();
+							}
+						} else {
+							$('#edd-migration-nav-warn').hide();
+							$('#edd-migration-ready').slideDown();
+						}
+
+					}
+				});
+			});
+		});
+	</script>
+
+	<div class="metabox-holder">
+		<div class="postbox">
+			<h2 class="hndle">
+				<span><?php _e( 'Update file download logs', 'easy-digital-downloads' ); ?></span>
+				<span class="dashicons dashicons-yes"></span>
+			</h2>
+			<div class="inside migrate-file-download-logs-control">
+				<p>
+					<?php _e( 'This will update the file download logs to remove some <abbr title="Personally Identifiable Information">PII</abbr> and make file download counts more accurate.', 'easy-digital-downloads' ); ?>
+				</p>
+				<form method="post" id="edd-fix-file-download-logs-form" class="edd-export-form edd-import-export-form">
+			<span class="step-instructions-wrapper">
+
+				<?php wp_nonce_field( 'edd_ajax_export', 'edd_ajax_export' ); ?>
+
+				<?php if ( ! $migration_complete ) : ?>
+					<span class="edd-migration allowed">
+						<input type="submit" id="migrate-logs-submit" value="<?php _e( 'Update File Download Logs', 'easy-digital-downloads' ); ?>" class="button-primary"/>
+					</span>
+				<?php else: ?>
+					<input type="submit" disabled="disabled" id="migrate-logs-submit" value="<?php _e( 'Update File Download Logs', 'easy-digital-downloads' ); ?>" class="button-secondary"/>
+					&mdash; <?php _e( 'File download logs have already been updated.', 'easy-digital-downloads' ); ?>
+				<?php endif; ?>
+
+				<input type="hidden" name="edd-export-class" value="EDD_File_Download_Log_Migration" />
+				<span class="spinner"></span>
+
+			</span>
+				</form>
+			</div><!-- .inside -->
+		</div><!-- .postbox -->
+	</div>
+
+	<?php
+}
+
+function edd_register_batch_file_download_log_migration() {
+	add_action( 'edd_batch_export_class_include', 'edd_include_file_download_log_migration_batch_processor', 10, 1 );
+}
+add_action( 'edd_register_batch_exporter', 'edd_register_batch_file_download_log_migration', 10 );
+
+
+function edd_include_file_download_log_migration_batch_processor( $class ) {
+
+	if ( 'EDD_File_Download_Log_Migration' === $class ) {
+		require_once EDD_PLUGIN_DIR . 'includes/admin/upgrades/classes/class-file-download-log-migration.php';
+	}
+
+}

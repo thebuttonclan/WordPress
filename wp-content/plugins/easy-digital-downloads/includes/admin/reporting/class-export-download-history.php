@@ -32,14 +32,13 @@ class EDD_Download_History_Export extends EDD_Export {
 	/**
 	 * Set the export headers
 	 *
-	 * @access public
 	 * @since 1.4.4
 	 * @return void
 	 */
 	public function headers() {
 		ignore_user_abort( true );
 
-		if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) )
+		if ( ! edd_is_func_disabled( 'set_time_limit' ) )
 			set_time_limit( 0 );
 
 		$month = isset( $_POST['month'] ) ? absint( $_POST['month'] ) : date( 'n' );
@@ -55,7 +54,6 @@ class EDD_Download_History_Export extends EDD_Export {
 	/**
 	 * Set the CSV columns
 	 *
-	 * @access public
 	 * @since 1.4.4
 	 * @return array $cols All the columns
 	 */
@@ -73,7 +71,6 @@ class EDD_Download_History_Export extends EDD_Export {
 	/**
 	 * Get the Export Data
 	 *
-	 * @access public
 	 * @since 1.4.4
  	 * @global object $edd_logs EDD Logs Object
 	 * @return array $data The data for the CSV file

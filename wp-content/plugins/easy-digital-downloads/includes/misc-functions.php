@@ -24,6 +24,20 @@ function edd_is_test_mode() {
 }
 
 /**
+ * Is Debug Mode
+ *
+ * @since 2.8.7
+ * @return bool $ret True if debug mode is enabled, false otherwise
+ */
+function edd_is_debug_mode() {
+	$ret = edd_get_option( 'debug_mode', false );
+	if( defined( 'EDD_DEBUG_MODE' ) && EDD_DEBUG_MODE ) {
+		$ret = true;
+	}
+	return (bool) apply_filters( 'edd_is_debug_mode', $ret );
+}
+
+/**
  * Checks if Guest checkout is enabled
  *
  * @since 1.0
@@ -59,7 +73,6 @@ function edd_straight_to_checkout() {
 /**
  * Disable Redownload
  *
- * @access public
  * @since 1.0.8.2
  * @return bool True if redownloading of files is disabled, false otherwise
  */
@@ -169,11 +182,18 @@ function edd_get_ip() {
 		$ip = $_SERVER['HTTP_CLIENT_IP'];
 	} elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
 		//to check ip is pass from proxy
-		$ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+		// can include more than 1 ip, first is the public one
+		$ip = explode(',',$_SERVER['HTTP_X_FORWARDED_FOR']);
+		$ip = trim($ip[0]);
 	} elseif( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
 		$ip = $_SERVER['REMOTE_ADDR'];
 	}
-	return apply_filters( 'edd_get_ip', $ip );
+
+	// Fix potential CSV returned from $_SERVER variables
+	$ip_array = explode( ',', $ip );
+	$ip_array = array_map( 'trim', $ip_array );
+
+	return apply_filters( 'edd_get_ip', $ip_array[0] );
 }
 
 
@@ -298,7 +318,7 @@ function edd_get_currencies() {
 	$currencies = array(
 		'USD'  => __( 'US Dollars (&#36;)', 'easy-digital-downloads' ),
 		'EUR'  => __( 'Euros (&euro;)', 'easy-digital-downloads' ),
-		'GBP'  => __( 'Pounds Sterling (&pound;)', 'easy-digital-downloads' ),
+		'GBP'  => __( 'Pound Sterling (&pound;)', 'easy-digital-downloads' ),
 		'AUD'  => __( 'Australian Dollars (&#36;)', 'easy-digital-downloads' ),
 		'BRL'  => __( 'Brazilian Real (R&#36;)', 'easy-digital-downloads' ),
 		'CAD'  => __( 'Canadian Dollars (&#36;)', 'easy-digital-downloads' ),
@@ -322,7 +342,8 @@ function edd_get_currencies() {
 		'INR'  => __( 'Indian Rupee (&#8377;)', 'easy-digital-downloads' ),
 		'TRY'  => __( 'Turkish Lira (&#8378;)', 'easy-digital-downloads' ),
 		'RIAL' => __( 'Iranian Rial (&#65020;)', 'easy-digital-downloads' ),
-		'RUB'  => __( 'Russian Rubles', 'easy-digital-downloads' )
+		'RUB'  => __( 'Russian Rubles', 'easy-digital-downloads' ),
+		'AOA'  => __( 'Angolan Kwanza', 'easy-digital-downloads' ),
 	);
 
 	return apply_filters( 'edd_currencies', $currencies );
@@ -373,6 +394,9 @@ function edd_currency_symbol( $currency = '' ) {
 			break;
 		case "JPY" :
 			$symbol = '&yen;';
+			break;
+		case "AOA" :
+			$symbol = 'Kz';
 			break;
 		default :
 			$symbol = $currency;
@@ -448,7 +472,7 @@ function edd_get_current_page_url( $nocache = false ) {
 
 	if ( is_front_page() ) {
 		$uri = home_url( '/' );
-	} elseif ( edd_is_checkout( array(), false ) ) {
+	} elseif ( edd_is_checkout() ) {
 		$uri = edd_get_checkout_uri();
 	}
 
@@ -496,7 +520,7 @@ function edd_add_cache_busting( $url = '' ) {
  *   trigger or false to not trigger error.
  *
  * @param string  $function    The function that was called
- * @param string  $version     The version of EDD that deprecated the function
+ * @param string  $version     The version of Easy Digital Downloads that deprecated the function
  * @param string  $replacement Optional. The function that should have been called
  * @param array   $backtrace   Optional. Contains stack backtrace of deprecated function
  */
@@ -585,7 +609,7 @@ function edd_is_func_disabled( $function ) {
  * @author Chris Christoff
  *
  * @param unknown $v
- * @return int|string
+ * @return int
  */
 function edd_let_to_num( $v ) {
 	$l   = substr( $v, -1 );
@@ -603,7 +627,7 @@ function edd_let_to_num( $v ) {
 			break;
 	}
 
-	return $ret;
+	return (int) $ret;
 }
 
 /**
@@ -651,11 +675,18 @@ function edd_get_upload_dir() {
 /**
  * Delete symbolic links after they have been used
  *
- * @access public
+ * This function is only intended to be used by WordPress cron.
+ *
  * @since  1.5
  * @return void
  */
 function edd_cleanup_file_symlinks() {
+
+	// Bail if not in WordPress cron
+	if ( ! edd_doing_cron() ) {
+		return;
+	}
+
 	$path = edd_get_symlink_dir();
 	$dir = opendir( $path );
 
@@ -719,24 +750,45 @@ function edd_get_timezone_id() {
 }
 
 /**
- * Convert an object to an associative array.
+ * Given an object or array of objects, convert them to arrays
  *
- * Can handle multidimensional arrays
- *
- * @since 1.7
- *
- * @param unknown $data
- * @return array
+ * @since    1.7
+ * @internal Updated in 2.6
+ * @param    object|array $object An object or an array of objects
+ * @return   array                An array or array of arrays, converted from the provided object(s)
  */
-function edd_object_to_array( $data ) {
-	if ( is_array( $data ) || is_object( $data ) ) {
-		$result = array();
-		foreach ( $data as $key => $value ) {
-			$result[ $key ] = edd_object_to_array( $value );
-		}
-		return $result;
+function edd_object_to_array( $object = array() ) {
+
+	if ( empty( $object ) || ( ! is_object( $object ) && ! is_array( $object ) ) ) {
+		return $object;
 	}
-	return $data;
+
+	if ( is_array( $object ) ) {
+		$return = array();
+		foreach ( $object as $item ) {
+			if ( $object instanceof EDD_Payment ) {
+				$return[] = $object->array_convert();
+			} else {
+				$return[] = edd_object_to_array( $item );
+			}
+
+		}
+	} else {
+		if ( $object instanceof EDD_Payment ) {
+			$return = $object->array_convert();
+		} else {
+			$return = get_object_vars( $object );
+
+			// Now look at the items that came back and convert any nested objects to arrays
+			foreach ( $return as $key => $value ) {
+				$value = ( is_array( $value ) || is_object( $value ) ) ? edd_object_to_array( $value ) : $value;
+				$return[ $key ] = $value;
+			}
+		}
+	}
+
+	return $return;
+
 }
 
 /**
@@ -848,12 +900,11 @@ if ( ! function_exists( 'getallheaders' ) ) :
 	 *
 	 * Ensure getallheaders function exists in the case we're using nginx
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return array
 	 */
 	function getallheaders() {
-		$headers = '';
+		$headers = array();
 		foreach ( $_SERVER as $name => $value ) {
 			if ( substr( $name, 0, 5 ) == 'HTTP_' ) {
 				$headers[ str_replace( ' ', '-', ucwords( strtolower( str_replace( '_', ' ', substr( $name, 5 ) ) ) ) ) ] = $value;
@@ -903,4 +954,47 @@ function edd_can_view_receipt( $payment_key = '' ) {
 	}
 
 	return (bool) apply_filters( 'edd_can_view_receipt', $return, $payment_key );
+}
+
+/**
+ * Given a Payment ID, generate a link to IP address provider (ipinfo.io)
+ *
+ * @since  2.8.15
+ * @param  int		$payment_id The Payment ID
+ * @return string	A link to the IP details provider
+ */
+function edd_payment_get_ip_address_url( $payment_id ) {
+
+	$payment = new EDD_Payment( $payment_id );
+
+	$base_url = 'https://ipinfo.io/';
+	$provider_url = '<a href="' . esc_url( $base_url ) . esc_attr( $payment->ip ) . '" target="_blank">' . esc_attr( $payment->ip ) . '</a>';
+
+	return apply_filters( 'edd_payment_get_ip_address_url', $provider_url, $payment->ip, $payment_id );
+
+}
+
+/**
+ * Abstraction for WordPress cron checking, to avoid code duplication.
+ *
+ * In future versions of EDD, this function will be changed to only refer to
+ * EDD specific cron related jobs. You probably won't want to use it until then.
+ *
+ * @since 2.8.16
+ *
+ * @return boolean
+ */
+function edd_doing_cron() {
+
+	// Bail if not doing WordPress cron (>4.8.0)
+	if ( function_exists( 'wp_doing_cron' ) && wp_doing_cron() ) {
+		return true;
+
+	// Bail if not doing WordPress cron (<4.8.0)
+	} elseif ( defined( 'DOING_CRON' ) && ( true === DOING_CRON ) ) {
+		return true;
+	}
+
+	// Default to false
+	return false;
 }

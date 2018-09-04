@@ -19,7 +19,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * @return bool True if on the Checkout page, false otherwise
  */
 function edd_is_checkout() {
-
 	global $wp_query;
 
 	$is_object_set    = isset( $wp_query->queried_object );
@@ -27,15 +26,18 @@ function edd_is_checkout() {
 	$is_checkout      = is_page( edd_get_option( 'purchase_page' ) );
 
 	if( ! $is_object_set ) {
-
 		unset( $wp_query->queried_object );
-
+	} else if ( is_singular() ) {
+		$content = $wp_query->queried_object->post_content;
 	}
 
 	if( ! $is_object_id_set ) {
-
 		unset( $wp_query->queried_object_id );
+	}
 
+	// If we know this isn't the primary checkout page, check other methods.
+	if ( ! $is_checkout && isset( $content ) && has_shortcode( $content, 'download_checkout' ) ) {
+		$is_checkout = true;
 	}
 
 	return apply_filters( 'edd_is_checkout', $is_checkout );
@@ -56,15 +58,20 @@ function edd_can_checkout() {
 /**
  * Retrieve the Success page URI
  *
- * @access      public
  * @since       1.6
  * @return      string
 */
-function edd_get_success_page_uri() {
+function edd_get_success_page_uri( $query_string = null ) {
 	$page_id = edd_get_option( 'success_page', 0 );
 	$page_id = absint( $page_id );
 
-	return apply_filters( 'edd_get_success_page_uri', get_permalink( $page_id ) );
+	$success_page = get_permalink( $page_id );
+
+	if ( $query_string ) {
+		$success_page .= $query_string;
+	}
+
+	return apply_filters( 'edd_get_success_page_uri', $success_page );
 }
 
 /**
@@ -86,7 +93,6 @@ function edd_is_success_page() {
  * Sends the user to the succes page.
  *
  * @param string $query_string
- * @access      public
  * @since       1.0
  * @return      void
 */
@@ -110,8 +116,18 @@ function edd_send_to_success_page( $query_string = null ) {
  * @return mixed Full URL to the checkout page, if present | null if it doesn't exist
  */
 function edd_get_checkout_uri( $args = array() ) {
-	$uri = edd_get_option( 'purchase_page', false );
-	$uri = isset( $uri ) ? get_permalink( $uri ) : NULL;
+	$uri = false;
+
+	if ( edd_is_checkout() ) {
+		global $post;
+		$uri = $post instanceof WP_Post ? get_permalink( $post->ID ) : NULL;
+	}
+
+	// If we are not on a checkout page, determine the URI from the default.
+	if ( empty( $uri ) ) {
+		$uri = edd_get_option( 'purchase_page', false );
+		$uri = isset( $uri ) ? get_permalink( $uri ) : NULL;
+	}
 
 	if ( ! empty( $args ) ) {
 		// Check for backward compatibility
@@ -145,7 +161,6 @@ function edd_get_checkout_uri( $args = array() ) {
  * page if there are errors present.
  *
  * @param array $args
- * @access public
  * @since  1.0
  * @return Void
  */
@@ -164,26 +179,6 @@ function edd_send_back_to_checkout( $args = array() ) {
 
 	wp_redirect( apply_filters( 'edd_send_back_to_checkout', $redirect, $args ) );
 	edd_die();
-}
-
-/**
- * Get Success Page URL
- *
- * Gets the success page URL.
- *
- * @param string $query_string
- * @access      public
- * @since       1.0
- * @return      string
-*/
-function edd_get_success_page_url( $query_string = null ) {
-	$success_page = edd_get_option( 'success_page', 0 );
-	$success_page = get_permalink( $success_page );
-
-	if ( $query_string )
-		$success_page .= $query_string;
-
-	return apply_filters( 'edd_success_page_url', $success_page );
 }
 
 /**
@@ -219,7 +214,6 @@ function edd_is_failed_transaction_page() {
 /**
  * Mark payments as Failed when returning to the Failed Transaction page
  *
- * @access      public
  * @since       1.9.9
  * @return      void
 */
@@ -248,7 +242,6 @@ add_action( 'template_redirect', 'edd_listen_for_failed_payments' );
  * Check if a field is required
  *
  * @param string $field
- * @access      public
  * @since       1.7
  * @return      bool
 */
@@ -273,33 +266,51 @@ function edd_get_banned_emails() {
  * Determines if an email is banned
  *
  * @since       2.0
- * @return      bool
+ * @param string $email Email to check if is banned.
+ * @return bool
  */
 function edd_is_email_banned( $email = '' ) {
 
+	$email = trim( $email );
 	if( empty( $email ) ) {
 		return false;
 	}
 
+	$email         = strtolower( $email );
 	$banned_emails = edd_get_banned_emails();
 
 	if( ! is_array( $banned_emails ) || empty( $banned_emails ) ) {
 		return false;
 	}
 
+	$return = false;
 	foreach( $banned_emails as $banned_email ) {
+
+		$banned_email = strtolower( $banned_email );
+
 		if( is_email( $banned_email ) ) {
-			$ret = ( $banned_email == trim( $email ) ? true : false );
+
+			// Complete email address
+			$return = ( $banned_email == $email ? true : false );
+
+		} elseif ( strpos( $banned_email, '.' ) === 0 ) {
+
+			// TLD block
+			$return = ( substr( $email, ( strlen( $banned_email ) * -1 ) ) == $banned_email ) ? true : false;
+
 		} else {
-			$ret = ( stristr( trim( $email ), $banned_email ) ? true : false );
+
+			// Domain block
+			$return = ( stristr( $email, $banned_email ) ? true : false );
+
 		}
 
-		if( true === $ret ) {
+		if( true === $return ) {
 			break;
 		}
 	}
 
-	return apply_filters( 'edd_is_email_banned', $ret, $email );
+	return apply_filters( 'edd_is_email_banned', $return, $email );
 }
 
 /**

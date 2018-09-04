@@ -32,7 +32,6 @@ class EDD_Batch_File_Downloads_Export extends EDD_Batch_Export {
 	/**
 	 * Set the CSV columns
 	 *
-	 * @access public
 	 * @since 2.4
 	 * @return array $cols All the columns
 	 */
@@ -52,7 +51,6 @@ class EDD_Batch_File_Downloads_Export extends EDD_Batch_Export {
 	/**
 	 * Get the Export Data
 	 *
-	 * @access public
 	 * @since 2.4
  	 * @global object $edd_logs EDD Logs Object
 	 * @return array $data The data for the CSV file
@@ -81,16 +79,30 @@ class EDD_Batch_File_Downloads_Export extends EDD_Batch_Export {
 
 		}
 
+		if ( 0 !== $this->download_id ) {
+			$args['post_parent'] = $this->download_id;
+		}
+
 		$logs = $edd_logs->get_connected_logs( $args );
 
 		if ( $logs ) {
 			foreach ( $logs as $log ) {
-				$user_info = get_post_meta( $log->ID, '_edd_log_user_info', true );
-				$files     = edd_get_download_files( $log->post_parent );
-				$file_id   = (int) get_post_meta( $log->ID, '_edd_log_file_id', true );
-				$file_name = isset( $files[ $file_id ]['name'] ) ? $files[ $file_id ]['name'] : null;
-				$user      = get_userdata( $user_info['id'] );
-				$user      = $user ? $user->user_login : $user_info['email'];
+				$customer_id = get_post_meta( $log->ID, '_edd_log_customer_id', true );
+				$customer    = false;
+				if ( ! empty( $customer_id ) ) {
+					$customer = new EDD_Customer( $customer_id );
+				}
+
+				$files       = edd_get_download_files( $log->post_parent );
+				$file_id     = (int) get_post_meta( $log->ID, '_edd_log_file_id', true );
+				$file_name   = isset( $files[ $file_id ]['name'] ) ? $files[ $file_id ]['name'] : null;
+
+				if ( ! empty( $customer ) ) {
+					$user = ! empty( $customer->name ) ? $customer->name : $customer->email;
+				} else {
+					$payment_id = get_post_meta( $log->ID, '_edd_log_payment_id', true );
+					$user       = edd_get_payment_user_email( $payment_id );
+				}
 
 				$data[]    = array(
 					'date'     => $log->post_date,
@@ -142,6 +154,10 @@ class EDD_Batch_File_Downloads_Export extends EDD_Batch_Export {
 			)
 		);
 
+		if ( 0 !== $this->download_id ) {
+			$args['post_parent'] = $this->download_id;
+		}
+
 		$logs       = new WP_Query( $args );
 		$total      = (int) $logs->post_count;
 		$percentage = 100;
@@ -158,7 +174,8 @@ class EDD_Batch_File_Downloads_Export extends EDD_Batch_Export {
 	}
 
 	public function set_properties( $request ) {
-		$this->start = isset( $request['start'] ) ? sanitize_text_field( $request['start'] ) : '';
-		$this->end   = isset( $request['end']  )  ? sanitize_text_field( $request['end']  )  : '';
+		$this->start       = isset( $request['start'] )         ? sanitize_text_field( $request['start'] ) : '';
+		$this->end         = isset( $request['end']  )          ? sanitize_text_field( $request['end']  )  : '';
+		$this->download_id = isset( $request['download_id'] )   ? absint( $request['download_id'] )        : 0;
 	}
 }

@@ -23,6 +23,140 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 add_action( 'edd_paypal_cc_form', '__return_false' );
 
 /**
+ * Register the PayPal Standard gateway subsection
+ *
+ * @since  2.6
+ * @param  array $gateway_sections  Current Gateway Tab subsections
+ * @return array                    Gateway subsections with PayPal Standard
+ */
+function edd_register_paypal_gateway_section( $gateway_sections ) {
+	$gateway_sections['paypal'] = __( 'PayPal Standard', 'easy-digital-downloads' );
+
+	return $gateway_sections;
+}
+add_filter( 'edd_settings_sections_gateways', 'edd_register_paypal_gateway_section', 1, 1 );
+
+/**
+ * Registers the PayPal Standard settings for the PayPal Standard subsection
+ *
+ * @since  2.6
+ * @param  array $gateway_settings  Gateway tab settings
+ * @return array                    Gateway tab settings with the PayPal Standard settings
+ */
+function edd_register_paypal_gateway_settings( $gateway_settings ) {
+
+		$paypal_settings = array (
+			'paypal_settings' => array(
+				'id'   => 'paypal_settings',
+				'name' => '<strong>' . __( 'PayPal Standard Settings', 'easy-digital-downloads' ) . '</strong>',
+				'type' => 'header',
+			),
+			'paypal_email' => array(
+				'id'   => 'paypal_email',
+				'name' => __( 'PayPal Email', 'easy-digital-downloads' ),
+				'desc' => __( 'Enter your PayPal account\'s email', 'easy-digital-downloads' ),
+				'type' => 'text',
+				'size' => 'regular',
+			),
+			'paypal_image_url' => array(
+				'id'   => 'paypal_image_url',
+				'name' => __( 'PayPal Image URL', 'easy-digital-downloads' ),
+				'desc' => __( 'Upload an image to display on the PayPal checkout page.', 'easy-digital-downloads' ),
+				'type' => 'upload',
+				'size' => 'regular',
+			),
+		);
+
+		$pdt_desc = sprintf(
+			__( 'Enter your PayPal Identity Token in order to enable Payment Data Transfer (PDT). This allows payments to be verified without relying on the PayPal IPN. See our <a href="%s" target="_blank">documentation</a> for further information.', 'easy-digital-downloads' ),
+			'http://docs.easydigitaldownloads.com/article/918-paypal-standard'
+		);
+
+		$paypal_settings['paypal_identify_token'] = array(
+			'id'   => 'paypal_identity_token',
+			'name' => __( 'PayPal Identity Token', 'easy-digital-downloads' ),
+			'type' => 'text',
+			'desc' => $pdt_desc,
+			'size' => 'regular',
+		);
+
+		$disable_ipn_desc = sprintf(
+			__( 'If you are unable to use Payment Data Transfer and payments are not getting marked as complete, then check this box. This forces the site to use a slightly less secure method of verifying purchases. See our <a href="%s" target="_blank">FAQ</a> for further information.', 'easy-digital-downloads' ),
+			'http://docs.easydigitaldownloads.com/article/190-payments-not-marked-as-complete'
+		);
+
+		$paypal_settings['disable_paypal_verification'] = array(
+			'id'   => 'disable_paypal_verification',
+			'name' => __( 'Disable PayPal IPN Verification', 'easy-digital-downloads' ),
+			'desc' => $disable_ipn_desc,
+			'type' => 'checkbox',
+		);
+
+		$api_key_settings = array(
+			'paypal_api_keys_desc' => array(
+				'id'   => 'paypal_api_keys_desc',
+				'name' => __( 'API Credentials', 'easy-digital-downloads' ),
+				'type' => 'descriptive_text',
+				'desc' => sprintf(
+					__( 'API credentials are necessary to process PayPal refunds from inside WordPress. These can be obtained from <a href="%s" target="_blank">your PayPal account</a>.', 'easy-digital-downloads' ),
+					'https://developer.paypal.com/docs/classic/api/apiCredentials/#creating-an-api-signature'
+				)
+			),
+			'paypal_live_api_username' => array(
+				'id'   => 'paypal_live_api_username',
+				'name' => __( 'Live API Username', 'easy-digital-downloads' ),
+				'desc' => __( 'Your PayPal live API username. ', 'easy-digital-downloads' ),
+				'type' => 'text',
+				'size' => 'regular'
+			),
+			'paypal_live_api_password' => array(
+				'id'   => 'paypal_live_api_password',
+				'name' => __( 'Live API Password', 'easy-digital-downloads' ),
+				'desc' => __( 'Your PayPal live API password.', 'easy-digital-downloads' ),
+				'type' => 'text',
+				'size' => 'regular'
+			),
+			'paypal_live_api_signature' => array(
+				'id'   => 'paypal_live_api_signature',
+				'name' => __( 'Live API Signature', 'easy-digital-downloads' ),
+				'desc' => __( 'Your PayPal live API signature.', 'easy-digital-downloads' ),
+				'type' => 'text',
+				'size' => 'regular'
+			),
+			'paypal_test_api_username' => array(
+				'id'   => 'paypal_test_api_username',
+				'name' => __( 'Test API Username', 'easy-digital-downloads' ),
+				'desc' => __( 'Your PayPal test API username.', 'easy-digital-downloads' ),
+				'type' => 'text',
+				'size' => 'regular'
+			),
+			'paypal_test_api_password' => array(
+				'id'   => 'paypal_test_api_password',
+				'name' => __( 'Test API Password', 'easy-digital-downloads' ),
+				'desc' => __( 'Your PayPal test API password.', 'easy-digital-downloads' ),
+				'type' => 'text',
+				'size' => 'regular'
+			),
+			'paypal_test_api_signature' => array(
+				'id'   => 'paypal_test_api_signature',
+				'name' => __( 'Test API Signature', 'easy-digital-downloads' ),
+				'desc' => __( 'Your PayPal test API signature.', 'easy-digital-downloads' ),
+				'type' => 'text',
+				'size' => 'regular'
+			)
+		);
+
+		$paypal_settings = array_merge( $paypal_settings, $api_key_settings );
+
+		$paypal_settings            = apply_filters( 'edd_paypal_settings', $paypal_settings );
+		$gateway_settings['paypal'] = $paypal_settings;
+
+		return $gateway_settings;
+}
+add_filter( 'edd_settings_gateways', 'edd_register_paypal_gateway_settings', 1, 1 );
+
+
+/**
  * Process PayPal Purchase
  *
  * @since 1.0
@@ -61,6 +195,9 @@ function edd_process_paypal_purchase( $purchase_data ) {
 		// Only send to PayPal if the pending payment is created successfully
 		$listener_url = add_query_arg( 'edd-listener', 'IPN', home_url( 'index.php' ) );
 
+		// Set the session data to recover this payment in the event of abandonment or error.
+		EDD()->session->set( 'edd_resume_payment', $payment );
+
 		// Get the success url
 		$return_url = add_query_arg( array(
 				'payment-confirmation' => 'paypal',
@@ -87,7 +224,7 @@ function edd_process_paypal_purchase( $purchase_data ) {
 			'return'        => $return_url,
 			'cancel_return' => edd_get_failed_transaction_uri( '?payment-id=' . $payment ),
 			'notify_url'    => $listener_url,
-			'page_style'    => edd_get_paypal_page_style(),
+			'image_url'     => edd_get_paypal_image_url(),
 			'cbt'           => get_bloginfo( 'name' ),
 			'bn'            => 'EasyDigitalDownloads_SP'
 		);
@@ -108,6 +245,7 @@ function edd_process_paypal_purchase( $purchase_data ) {
 
 		// Add cart items
 		$i = 1;
+		$paypal_sum = 0;
 		if( is_array( $purchase_data['cart_details'] ) && ! empty( $purchase_data['cart_details'] ) ) {
 			foreach ( $purchase_data['cart_details'] as $item ) {
 
@@ -125,6 +263,8 @@ function edd_process_paypal_purchase( $purchase_data ) {
 					$paypal_args['item_number_' . $i ] = edd_get_download_sku( $item['id'] );
 				}
 
+				$paypal_sum += ( $item_amount * $item['quantity'] );
+
 				$i++;
 
 			}
@@ -135,14 +275,15 @@ function edd_process_paypal_purchase( $purchase_data ) {
 		if ( ! empty( $purchase_data['fees'] ) ) {
 			$i = empty( $i ) ? 1 : $i;
 			foreach ( $purchase_data['fees'] as $fee ) {
-				if ( floatval( $fee['amount'] ) > '0' ) {
+				if ( empty( $fee['download_id'] ) && floatval( $fee['amount'] ) > '0' ) {
 					// this is a positive fee
 					$paypal_args['item_name_' . $i ] = stripslashes_deep( html_entity_decode( wp_strip_all_tags( $fee['label'] ), ENT_COMPAT, 'UTF-8' ) );
 					$paypal_args['quantity_' . $i ]  = '1';
 					$paypal_args['amount_' . $i ]    = edd_sanitize_amount( $fee['amount'] );
 					$i++;
-				} else {
-					// This is a negative fee (discount)
+				} else if ( empty( $fee['download_id'] ) ) {
+
+					// This is a negative fee (discount) not assigned to a specific Download
 					$discounted_amount += abs( $fee['amount'] );
 				}
 			}
@@ -150,6 +291,14 @@ function edd_process_paypal_purchase( $purchase_data ) {
 
 		if ( $discounted_amount > '0' ) {
 			$paypal_args['discount_amount_cart'] = edd_sanitize_amount( $discounted_amount );
+		}
+
+		if( $paypal_sum > $purchase_data['price'] ) {
+			$difference = round( $paypal_sum - $purchase_data['price'], 2 );
+			if( ! isset( $paypal_args['discount_amount_cart'] ) ) {
+				$paypal_args['discount_amount_cart'] = 0;
+			}
+			$paypal_args['discount_amount_cart'] += $difference;
 		}
 
 		// Add taxes to the cart
@@ -161,14 +310,13 @@ function edd_process_paypal_purchase( $purchase_data ) {
 
 		$paypal_args = apply_filters( 'edd_paypal_redirect_args', $paypal_args, $purchase_data );
 
+		edd_debug_log( 'PayPal arguments: ' . print_r( $paypal_args, true ) );
+
 		// Build query
 		$paypal_redirect .= http_build_query( $paypal_args );
 
 		// Fix for some sites that encode the entities
 		$paypal_redirect = str_replace( '&amp;', '&', $paypal_redirect );
-
-		// Get rid of cart contents
-		edd_empty_cart();
 
 		// Redirect to PayPal
 		wp_redirect( $paypal_redirect );
@@ -186,7 +334,22 @@ add_action( 'edd_gateway_paypal', 'edd_process_paypal_purchase' );
  */
 function edd_listen_for_paypal_ipn() {
 	// Regular PayPal IPN
-	if ( isset( $_GET['edd-listener'] ) && $_GET['edd-listener'] == 'IPN' ) {
+	if ( isset( $_GET['edd-listener'] ) && 'ipn' === strtolower( $_GET['edd-listener'] ) ) {
+
+		edd_debug_log( 'PayPal IPN endpoint loaded' );
+
+		/**
+		 * This is necessary to delay execution of PayPal PDT and to avoid a race condition causing the order status
+		 * updates to be triggered twice.
+		 *
+		 * @since 2.9.4
+		 * @see https://github.com/easydigitaldownloads/easy-digital-downloads/issues/6605
+		 */
+		$token = edd_get_option( 'paypal_identity_token' );
+		if ( $token ) {
+			sleep( 5 );
+		}
+
 		do_action( 'edd_verify_paypal_ipn' );
 	}
 }
@@ -203,6 +366,8 @@ function edd_process_paypal_ipn() {
 	if ( isset( $_SERVER['REQUEST_METHOD'] ) && $_SERVER['REQUEST_METHOD'] != 'POST' ) {
 		return;
 	}
+
+	edd_debug_log( 'edd_process_paypal_ipn() running during PayPal IPN processing' );
 
 	// Set initial post data to empty string
 	$post_data = '';
@@ -223,7 +388,7 @@ function edd_process_paypal_ipn() {
 	// Verify there is a post_data
 	if ( $post_data || strlen( $post_data ) > 0 ) {
 		// Append the data
-		$encoded_data .= $arg_separator.$post_data;
+		$encoded_data .= $arg_separator . $post_data;
 	} else {
 		// Check if POST is empty
 		if ( empty( $_POST ) ) {
@@ -233,12 +398,10 @@ function edd_process_paypal_ipn() {
 			// Loop through each POST
 			foreach ( $_POST as $key => $value ) {
 				// Encode the value and append the data
-				$encoded_data .= $arg_separator."$key=" . urlencode( $value );
+				$encoded_data .= $arg_separator . "$key=" . urlencode( $value );
 			}
 		}
 	}
-
-
 
 	// Convert collected post data to an array
 	parse_str( $encoded_data, $encoded_data_array );
@@ -247,7 +410,7 @@ function edd_process_paypal_ipn() {
 
 		if ( false !== strpos( $key, 'amp;' ) ) {
 			$new_key = str_replace( '&amp;', '&', $key );
-			$new_key = str_replace( 'amp;', '&' , $new_key );
+			$new_key = str_replace( 'amp;', '&', $new_key );
 
 			unset( $encoded_data_array[ $key ] );
 			$encoded_data_array[ $new_key ] = $value;
@@ -255,48 +418,67 @@ function edd_process_paypal_ipn() {
 
 	}
 
-	// Get the PayPal redirect uri
-	$paypal_redirect = edd_get_paypal_redirect( true );
+	/**
+	 * PayPal Web IPN Verification
+	 *
+	 * Allows filtering the IPN Verification data that PayPal passes back in via IPN with PayPal Standard
+	 *
+	 * @since 2.8.13
+	 *
+	 * @param array $data      The PayPal Web Accept Data
+	 */
+	$encoded_data_array = apply_filters( 'edd_process_paypal_ipn_data', $encoded_data_array );
+
+	edd_debug_log( 'encoded_data_array data array: ' . print_r( $encoded_data_array, true ) );
 
 	if ( ! edd_get_option( 'disable_paypal_verification' ) ) {
 
 		// Validate the IPN
 
-		$remote_post_vars      = array(
-			'method'           => 'POST',
-			'timeout'          => 45,
-			'redirection'      => 5,
-			'httpversion'      => '1.1',
-			'blocking'         => true,
-			'headers'          => array(
+		$remote_post_vars = array(
+			'method'      => 'POST',
+			'timeout'     => 45,
+			'redirection' => 5,
+			'httpversion' => '1.1',
+			'blocking'    => true,
+			'headers'     => array(
 				'host'         => 'www.paypal.com',
 				'connection'   => 'close',
 				'content-type' => 'application/x-www-form-urlencoded',
 				'post'         => '/cgi-bin/webscr HTTP/1.1',
+				'user-agent'   => 'EDD IPN Verification/' . EDD_VERSION . '; ' . get_bloginfo( 'url' )
 
 			),
-			'sslverify'        => false,
-			'body'             => $encoded_data_array
+			'sslverify'   => false,
+			'body'        => $encoded_data_array
 		);
 
+		edd_debug_log( 'Attempting to verify PayPal IPN. Data sent for verification: ' . print_r( $remote_post_vars, true ) );
+
 		// Get response
-		$api_response = wp_remote_post( edd_get_paypal_redirect(), $remote_post_vars );
+		$api_response = wp_remote_post( edd_get_paypal_redirect( true, true ), $remote_post_vars );
 
 		if ( is_wp_error( $api_response ) ) {
 			edd_record_gateway_error( __( 'IPN Error', 'easy-digital-downloads' ), sprintf( __( 'Invalid IPN verification response. IPN data: %s', 'easy-digital-downloads' ), json_encode( $api_response ) ) );
+			edd_debug_log( 'Invalid IPN verification response. IPN data: ' . print_r( $api_response, true ) );
+
 			return; // Something went wrong
 		}
 
-		if ( $api_response['body'] !== 'VERIFIED' && edd_get_option( 'disable_paypal_verification', false ) ) {
+		if ( wp_remote_retrieve_body( $api_response ) !== 'VERIFIED' && edd_get_option( 'disable_paypal_verification', false ) ) {
 			edd_record_gateway_error( __( 'IPN Error', 'easy-digital-downloads' ), sprintf( __( 'Invalid IPN verification response. IPN data: %s', 'easy-digital-downloads' ), json_encode( $api_response ) ) );
+			edd_debug_log( 'Invalid IPN verification response. IPN data: ' . print_r( $api_response, true ) );
+
 			return; // Response not okay
 		}
 
+		edd_debug_log( 'IPN verified successfully' );
 	}
 
 	// Check if $post_data_array has been populated
-	if ( ! is_array( $encoded_data_array ) && !empty( $encoded_data_array ) )
+	if ( ! is_array( $encoded_data_array ) && ! empty( $encoded_data_array ) ) {
 		return;
+	}
 
 	$defaults = array(
 		'txn_type'       => '',
@@ -305,7 +487,17 @@ function edd_process_paypal_ipn() {
 
 	$encoded_data_array = wp_parse_args( $encoded_data_array, $defaults );
 
-	$payment_id = isset( $encoded_data_array['custom'] ) ? absint( $encoded_data_array['custom'] ) : 0;
+	$payment_id = 0;
+
+	if ( ! empty( $encoded_data_array[ 'parent_txn_id' ] ) ) {
+		$payment_id = edd_get_purchase_id_by_transaction_id( $encoded_data_array[ 'parent_txn_id' ] );
+	} elseif ( ! empty( $encoded_data_array[ 'txn_id' ] ) ) {
+		$payment_id = edd_get_purchase_id_by_transaction_id( $encoded_data_array[ 'txn_id' ] );
+	}
+
+	if ( empty( $payment_id ) ) {
+		$payment_id = ! empty( $encoded_data_array[ 'custom' ] ) ? absint( $encoded_data_array[ 'custom' ] ) : 0;
+	}
 
 	if ( has_action( 'edd_paypal_' . $encoded_data_array['txn_type'] ) ) {
 		// Allow PayPal IPN types to be processed separately
@@ -326,6 +518,19 @@ add_action( 'edd_verify_paypal_ipn', 'edd_process_paypal_ipn' );
  * @return void
  */
 function edd_process_paypal_web_accept_and_cart( $data, $payment_id ) {
+
+	/**
+	 * PayPal Web Accept Data
+	 *
+	 * Allows filtering the Web Accept data that PayPal passes back in via IPN with PayPal Standard
+	 *
+	 * @since 2.8.13
+	 *
+	 * @param array $data      The PayPal Web Accept Data
+	 * @param int  $payment_id The Payment ID associated with this IPN request
+	 */
+	$data = apply_filters( 'edd_paypal_web_accept_and_cart_data', $data, $payment_id );
+
 	if ( $data['txn_type'] != 'web_accept' && $data['txn_type'] != 'cart' && $data['payment_status'] != 'Refunded' ) {
 		return;
 	}
@@ -334,62 +539,74 @@ function edd_process_paypal_web_accept_and_cart( $data, $payment_id ) {
 		return;
 	}
 
+	$payment = new EDD_Payment( $payment_id );
+
 	// Collect payment details
 	$purchase_key   = isset( $data['invoice'] ) ? $data['invoice'] : $data['item_number'];
 	$paypal_amount  = $data['mc_gross'];
 	$payment_status = strtolower( $data['payment_status'] );
 	$currency_code  = strtolower( $data['mc_currency'] );
 	$business_email = isset( $data['business'] ) && is_email( $data['business'] ) ? trim( $data['business'] ) : trim( $data['receiver_email'] );
-	$payment_meta   = edd_get_payment_meta( $payment_id );
 
 
-	if ( edd_get_payment_gateway( $payment_id ) != 'paypal' ) {
+	if ( $payment->gateway != 'paypal' ) {
 		return; // this isn't a PayPal standard IPN
 	}
 
 	// Verify payment recipient
 	if ( strcasecmp( $business_email, trim( edd_get_option( 'paypal_email', false ) ) ) != 0 ) {
 		edd_record_gateway_error( __( 'IPN Error', 'easy-digital-downloads' ), sprintf( __( 'Invalid business email in IPN response. IPN data: %s', 'easy-digital-downloads' ), json_encode( $data ) ), $payment_id );
+		edd_debug_log( 'Invalid business email in IPN response. IPN data: ' . print_r( $data, true ) );
 		edd_update_payment_status( $payment_id, 'failed' );
 		edd_insert_payment_note( $payment_id, __( 'Payment failed due to invalid PayPal business email.', 'easy-digital-downloads' ) );
 		return;
 	}
 
 	// Verify payment currency
-	if ( $currency_code != strtolower( $payment_meta['currency'] ) ) {
+	if ( $currency_code != strtolower( $payment->currency ) ) {
 
 		edd_record_gateway_error( __( 'IPN Error', 'easy-digital-downloads' ), sprintf( __( 'Invalid currency in IPN response. IPN data: %s', 'easy-digital-downloads' ), json_encode( $data ) ), $payment_id );
+		edd_debug_log( 'Invalid currency in IPN response. IPN data: ' . print_r( $data, true ) );
 		edd_update_payment_status( $payment_id, 'failed' );
 		edd_insert_payment_note( $payment_id, __( 'Payment failed due to invalid currency in PayPal IPN.', 'easy-digital-downloads' ) );
 		return;
 	}
 
-	if ( ! edd_get_payment_user_email( $payment_id ) ) {
+	if ( empty( $payment->email ) ) {
 
 		// This runs when a Buy Now purchase was made. It bypasses checkout so no personal info is collected until PayPal
 
-		// No email associated with purchase, so store from PayPal
-		edd_update_payment_meta( $payment_id, '_edd_payment_user_email', $data['payer_email'] );
-
 		// Setup and store the customers's details
 		$address = array();
-		$address['line1']   = ! empty( $data['address_street']       ) ? sanitize_text_field( $data['address_street'] )       : false;
-		$address['city']    = ! empty( $data['address_city']         ) ? sanitize_text_field( $data['address_city'] )         : false;
-		$address['state']   = ! empty( $data['address_state']        ) ? sanitize_text_field( $data['address_state'] )        : false;
-		$address['country'] = ! empty( $data['address_country_code'] ) ? sanitize_text_field( $data['address_country_code'] ) : false;
-		$address['zip']     = ! empty( $data['address_zip']          ) ? sanitize_text_field( $data['address_zip'] )          : false;
+		$address['line1']    = ! empty( $data['address_street']       ) ? sanitize_text_field( $data['address_street'] )       : false;
+		$address['city']     = ! empty( $data['address_city']         ) ? sanitize_text_field( $data['address_city'] )         : false;
+		$address['state']    = ! empty( $data['address_state']        ) ? sanitize_text_field( $data['address_state'] )        : false;
+		$address['country']  = ! empty( $data['address_country_code'] ) ? sanitize_text_field( $data['address_country_code'] ) : false;
+		$address['zip']      = ! empty( $data['address_zip']          ) ? sanitize_text_field( $data['address_zip'] )          : false;
 
-		$user_info = array(
-			'id'         => '-1',
-			'email'      => sanitize_text_field( $data['payer_email'] ),
-			'first_name' => sanitize_text_field( $data['first_name'] ),
-			'last_name'  => sanitize_text_field( $data['last_name'] ),
-			'discount'   => '',
-			'address'    => $address
-		);
+		$payment->email      = sanitize_text_field( $data['payer_email'] );
+		$payment->first_name = sanitize_text_field( $data['first_name'] );
+		$payment->last_name  = sanitize_text_field( $data['last_name'] );
+		$payment->address    = $address;
 
-		$payment_meta['user_info'] = $user_info;
-		edd_update_payment_meta( $payment_id, '_edd_payment_meta', $payment_meta );
+		if( empty( $payment->customer_id ) ) {
+
+			$customer = new EDD_Customer( $payment->email );
+			if( ! $customer || $customer->id < 1 ) {
+
+				$customer->create( array(
+					'email'   => $payment->email,
+					'name'    => $payment->first_name . ' ' . $payment->last_name,
+					'user_id' => $payment->user_id
+				) );
+
+			}
+
+			$payment->customer_id = $customer->id;
+		}
+
+		$payment->save();
+
 	}
 
 	if ( $payment_status == 'refunded' || $payment_status == 'reversed' ) {
@@ -409,12 +626,14 @@ function edd_process_paypal_web_accept_and_cart( $data, $payment_id ) {
 		if ( number_format( (float) $paypal_amount, 2 ) < number_format( (float) $payment_amount, 2 ) ) {
 			// The prices don't match
 			edd_record_gateway_error( __( 'IPN Error', 'easy-digital-downloads' ), sprintf( __( 'Invalid payment amount in IPN response. IPN data: %s', 'easy-digital-downloads' ), json_encode( $data ) ), $payment_id );
+			edd_debug_log( 'Invalid payment amount in IPN response. IPN data: ' . printf( $data, true ) );
 			edd_update_payment_status( $payment_id, 'failed' );
 			edd_insert_payment_note( $payment_id, __( 'Payment failed due to invalid amount in PayPal IPN.', 'easy-digital-downloads' ) );
 			return;
 		}
 		if ( $purchase_key != edd_get_payment_key( $payment_id ) ) {
 			// Purchase keys don't match
+			edd_debug_log( 'Invalid purchase key in IPN response. IPN data: ' . printf( $data, true ) );
 			edd_record_gateway_error( __( 'IPN Error', 'easy-digital-downloads' ), sprintf( __( 'Invalid purchase key in IPN response. IPN data: %s', 'easy-digital-downloads' ), json_encode( $data ) ), $payment_id );
 			edd_update_payment_status( $payment_id, 'failed' );
 			edd_insert_payment_note( $payment_id, __( 'Payment failed due to invalid purchase key in PayPal IPN.', 'easy-digital-downloads' ) );
@@ -438,7 +657,8 @@ function edd_process_paypal_web_accept_and_cart( $data, $payment_id ) {
 				case 'echeck' :
 
 					$note = __( 'Payment made via eCheck and will clear automatically in 5-8 days', 'easy-digital-downloads' );
-
+					$payment->status = 'processing';
+					$payment->save();
 					break;
 
 				case 'address' :
@@ -494,6 +714,7 @@ function edd_process_paypal_web_accept_and_cart( $data, $payment_id ) {
 
 			if( ! empty( $note ) ) {
 
+				edd_debug_log( 'Payment not marked as completed because: ' . $note );
 				edd_insert_payment_note( $payment_id, $note );
 
 			}
@@ -512,8 +733,19 @@ add_action( 'edd_paypal_web_accept', 'edd_process_paypal_web_accept_and_cart', 1
  */
 function edd_process_paypal_refund( $data, $payment_id = 0 ) {
 
-	// Collect payment details
+	/**
+	 * PayPal Process Refund Data
+	 *
+	 * Allows filtering the Refund data that PayPal passes back in via IPN with PayPal Standard
+	 *
+	 * @since 2.8.13
+	 *
+	 * @param array $data      The PayPal Refund data
+	 * @param int  $payment_id The Payment ID associated with this IPN request
+	 */
+	$data = apply_filters( 'edd_process_paypal_refund_data', $data, $payment_id );
 
+	// Collect payment details
 	if( empty( $payment_id ) ) {
 		return;
 	}
@@ -542,40 +774,63 @@ function edd_process_paypal_refund( $data, $payment_id = 0 ) {
  *
  * @since 1.0.8.2
  * @param bool    $ssl_check Is SSL?
+ * @param bool    $ipn       Is this an IPN verification check?
  * @return string
  */
-function edd_get_paypal_redirect( $ssl_check = false ) {
+function edd_get_paypal_redirect( $ssl_check = false, $ipn = false ) {
+
+	$protocol = 'http://';
 	if ( is_ssl() || ! $ssl_check ) {
-		$protocal = 'https://';
-	} else {
-		$protocal = 'http://';
+		$protocol = 'https://';
 	}
 
 	// Check the current payment mode
 	if ( edd_is_test_mode() ) {
+
 		// Test mode
-		$paypal_uri = $protocal . 'www.sandbox.paypal.com/cgi-bin/webscr';
+
+		if( $ipn ) {
+
+			$paypal_uri = 'https://ipnpb.sandbox.paypal.com/cgi-bin/webscr';
+
+		} else {
+
+			$paypal_uri = $protocol . 'www.sandbox.paypal.com/cgi-bin/webscr';
+
+		}
+
 	} else {
+
 		// Live mode
-		$paypal_uri = $protocal . 'www.paypal.com/cgi-bin/webscr';
+
+		if( $ipn ) {
+
+			$paypal_uri = 'https://ipnpb.paypal.com/cgi-bin/webscr';
+
+		} else {
+
+			$paypal_uri = $protocol . 'www.paypal.com/cgi-bin/webscr';
+
+		}
+
 	}
 
-	return apply_filters( 'edd_paypal_uri', $paypal_uri );
+	return apply_filters( 'edd_paypal_uri', $paypal_uri, $ssl_check, $ipn );
 }
 
 /**
- * Set the Page Style for PayPal Purchase page
+ * Get the image for the PayPal purchase page.
  *
- * @since 1.4.1
+ * @since 2.8
  * @return string
  */
-function edd_get_paypal_page_style() {
-	$page_style = trim( edd_get_option( 'paypal_page_style', 'PayPal' ) );
-	return apply_filters( 'edd_paypal_page_style', $page_style );
+function edd_get_paypal_image_url() {
+	$image_url = trim( edd_get_option( 'paypal_image_url', '' ) );
+	return apply_filters( 'edd_paypal_image_url', $image_url );
 }
 
 /**
- * Shows "Purchase Processing" message for PayPal payments are still pending on site return
+ * Shows "Purchase Processing" message for PayPal payments are still pending on site return.
  *
  * This helps address the Race Condition, as detailed in issue #1839
  *
@@ -588,6 +843,8 @@ function edd_paypal_success_page_content( $content ) {
 		return $content;
 	}
 
+	edd_empty_cart();
+
 	$payment_id = isset( $_GET['payment-id'] ) ? absint( $_GET['payment-id'] ) : false;
 
 	if ( ! $payment_id ) {
@@ -595,9 +852,9 @@ function edd_paypal_success_page_content( $content ) {
 		$payment_id = edd_get_purchase_id_by_key( $session['purchase_key'] );
 	}
 
-	$payment = get_post( $payment_id );
+	$payment = new EDD_Payment( $payment_id );
 
-	if ( $payment && 'pending' == $payment->post_status ) {
+	if ( $payment->ID > 0 && 'pending' == $payment->status  ) {
 
 		// Payment is still pending so show processing indicator to fix the Race Condition, issue #
 		ob_start();
@@ -612,6 +869,90 @@ function edd_paypal_success_page_content( $content ) {
 
 }
 add_filter( 'edd_payment_confirm_paypal', 'edd_paypal_success_page_content' );
+
+/**
+ * Mark payment as complete on return from PayPal if a PayPal Identity Token is present.
+ *
+ * See https://github.com/easydigitaldownloads/easy-digital-downloads/issues/6197
+ *
+ * @since 2.8.13
+ * @return void
+ */
+function edd_paypal_process_pdt_on_return() {
+
+	if ( ! isset( $_GET['payment-id'] ) || ! isset( $_GET['tx'] ) ) {
+		return;
+	}
+
+	$token = edd_get_option( 'paypal_identity_token' );
+
+	if( ! edd_is_success_page() || ! $token || ! edd_is_gateway_active( 'paypal' ) ) {
+		return;
+	}
+
+	$payment_id = isset( $_GET['payment-id'] ) ? absint( $_GET['payment-id'] ) : false;
+
+	if( empty( $payment_id ) ) {
+		return;
+	}
+
+	$payment = new EDD_Payment( $payment_id );
+
+	if( $token && ! empty( $_GET['tx'] ) && $payment->ID > 0 ) {
+
+		// An identity token has been provided in settings so let's immediately verify the purchase
+
+		$remote_post_vars = array(
+			'method'      => 'POST',
+			'timeout'     => 45,
+			'redirection' => 5,
+			'httpversion' => '1.1',
+			'blocking'    => true,
+			'headers'     => array(
+				'host'         => 'www.paypal.com',
+				'connection'   => 'close',
+				'content-type' => 'application/x-www-form-urlencoded',
+				'post'         => '/cgi-bin/webscr HTTP/1.1',
+				'user-agent'   => 'EDD PDT Verification/' . EDD_VERSION . '; ' . get_bloginfo( 'url' )
+
+			),
+			'sslverify'   => false,
+			'body'        => array(
+				'tx'  => sanitize_text_field( $_GET['tx'] ),
+				'at'  => $token,
+				'cmd' => '_notify-synch',
+			)
+		);
+
+		// Sanitize the data for debug logging.
+		$debug_args               = $remote_post_vars;
+		$debug_args['body']['at'] = str_pad( substr( $debug_args['body']['at'], -6 ), strlen( $debug_args['body']['at'] ), '*', STR_PAD_LEFT );
+		edd_debug_log( 'Attempting to verify PayPal payment with PDT. Args: ' . print_r( $debug_args, true ) );
+
+		$request = wp_remote_post( edd_get_paypal_redirect( true, true ), $remote_post_vars );
+
+		if ( ! is_wp_error( $request ) ) {
+
+			$body = wp_remote_retrieve_body( $request );
+
+			if( false !== strpos( $body, 'SUCCESS' ) ) {
+
+				// Purchase verified, set to completed
+				$payment->status = 'publish';
+				$payment->transaction_id = sanitize_text_field( $_GET['tx'] );
+				$payment->save();
+
+			}
+
+		} else {
+
+			edd_debug_log( 'Attempt to verify PayPal payment with PDT failed. Request return: ' . print_r( $request, true ) );
+
+		}
+	}
+
+}
+add_action( 'template_redirect', 'edd_paypal_process_pdt_on_return' );
 
 /**
  * Given a Payment ID, extract the transaction ID
@@ -646,10 +987,207 @@ add_filter( 'edd_get_payment_transaction_id-paypal', 'edd_paypal_get_payment_tra
  */
 function edd_paypal_link_transaction_id( $transaction_id, $payment_id ) {
 
-	$paypal_base_url = 'https://www.paypal.com/webscr?cmd=_history-details-from-hub&id=';
+	$payment = new EDD_Payment( $payment_id );
+	$sandbox = 'test' == $payment->mode ? 'sandbox.' : '';
+	$paypal_base_url = 'https://www.' . $sandbox . 'paypal.com/webscr?cmd=_history-details-from-hub&id=';
 	$transaction_url = '<a href="' . esc_url( $paypal_base_url . $transaction_id ) . '" target="_blank">' . $transaction_id . '</a>';
 
 	return apply_filters( 'edd_paypal_link_payment_details_transaction_id', $transaction_url );
 
 }
 add_filter( 'edd_payment_details_transaction_id-paypal', 'edd_paypal_link_transaction_id', 10, 2 );
+
+/**
+ * Shows checkbox to automatically refund payments made in PayPal.
+ *
+ * @since  2.6.0
+ *
+ * @param int $payment_id The current payment ID.
+ * @return void
+ */
+function edd_paypal_refund_admin_js( $payment_id = 0 ) {
+
+	// If not the proper gateway, return early.
+	if ( 'paypal' !== edd_get_payment_gateway( $payment_id ) ) {
+		return;
+	}
+
+	// If our credentials are not set, return early.
+	$key       = edd_get_payment_meta( $payment_id, '_edd_payment_mode', true );
+	$username  = edd_get_option( 'paypal_' . $key . '_api_username' );
+	$password  = edd_get_option( 'paypal_' . $key . '_api_password' );
+	$signature = edd_get_option( 'paypal_' . $key . '_api_signature' );
+
+	if ( empty( $username ) || empty( $password ) || empty( $signature ) ) {
+		return;
+	}
+
+	// Localize the refund checkbox label.
+	$label = __( 'Refund Payment in PayPal', 'easy-digital-downloads' );
+
+	?>
+	<script type="text/javascript">
+		jQuery(document).ready(function($) {
+			$('select[name=edd-payment-status]').change(function() {
+				if ( 'refunded' == $(this).val() ) {
+					$(this).parent().parent().append('<input type="checkbox" id="edd-paypal-refund" name="edd-paypal-refund" value="1" style="margin-top:0">');
+					$(this).parent().parent().append('<label for="edd-paypal-refund"><?php echo $label; ?></label>');
+				} else {
+					$('#edd-paypal-refund').remove();
+					$('label[for="edd-paypal-refund"]').remove();
+				}
+			});
+		});
+	</script>
+	<?php
+}
+add_action( 'edd_view_order_details_before', 'edd_paypal_refund_admin_js', 100 );
+
+/**
+ * Possibly refunds a payment made with PayPal Standard or PayPal Express.
+ *
+ * @since  2.6.0
+ *
+ * @param int $payment_id The current payment ID.
+ * @return void
+ */
+function edd_maybe_refund_paypal_purchase( EDD_Payment $payment ) {
+
+
+	if( ! current_user_can( 'edit_shop_payments', $payment->ID ) ) {
+		return;
+	}
+
+	if( empty( $_POST['edd-paypal-refund'] ) ) {
+		return;
+	}
+
+	$processed = $payment->get_meta( '_edd_paypal_refunded', true );
+
+	// If the status is not set to "refunded", return early.
+	if ( 'publish' !== $payment->old_status && 'revoked' !== $payment->old_status ) {
+		return;
+	}
+
+	// If not PayPal/PayPal Express, return early.
+	if ( 'paypal' !== $payment->gateway ) {
+		return;
+	}
+
+	// If the payment has already been refunded in the past, return early.
+	if ( $processed ) {
+		return;
+	}
+
+	// Process the refund in PayPal.
+	edd_refund_paypal_purchase( $payment );
+
+}
+add_action( 'edd_pre_refund_payment', 'edd_maybe_refund_paypal_purchase', 999 );
+
+/**
+ * Refunds a purchase made via PayPal.
+ *
+ * @since  2.6.0
+ *
+ * @param object|int $payment The payment ID or object to refund.
+ * @return void
+ */
+function edd_refund_paypal_purchase( $payment ) {
+
+	if( ! $payment instanceof EDD_Payment && is_numeric( $payment ) ) {
+		$payment = new EDD_Payment( $payment );
+	}
+
+	// Set PayPal API key credentials.
+	$credentials = array(
+		'api_endpoint'  => 'test' == $payment->mode ? 'https://api-3t.sandbox.paypal.com/nvp' : 'https://api-3t.paypal.com/nvp',
+		'api_username'  => edd_get_option( 'paypal_' . $payment->mode . '_api_username' ),
+		'api_password'  => edd_get_option( 'paypal_' . $payment->mode . '_api_password' ),
+		'api_signature' => edd_get_option( 'paypal_' . $payment->mode . '_api_signature' )
+	);
+
+	$credentials = apply_filters( 'edd_paypal_refund_api_credentials', $credentials, $payment );
+
+	$body = array(
+		'USER' 			=> $credentials['api_username'],
+		'PWD'  			=> $credentials['api_password'],
+		'SIGNATURE' 	=> $credentials['api_signature'],
+		'VERSION'       => '124',
+		'METHOD'        => 'RefundTransaction',
+		'TRANSACTIONID' => $payment->transaction_id,
+		'REFUNDTYPE'    => 'Full'
+	);
+
+	$body = apply_filters( 'edd_paypal_refund_body_args', $body, $payment );
+
+	// Prepare the headers of the refund request.
+	$headers = array(
+		'Content-Type'  => 'application/x-www-form-urlencoded',
+		'Cache-Control' => 'no-cache'
+	);
+
+	$headers = apply_filters( 'edd_paypal_refund_header_args', $headers, $payment );
+
+	// Prepare args of the refund request.
+	$args = array(
+		'body' 	      => $body,
+		'headers'     => $headers,
+		'httpversion' => '1.1'
+	);
+
+	$args = apply_filters( 'edd_paypal_refund_request_args', $args, $payment );
+
+	$error_msg = '';
+	$request   = wp_remote_post( $credentials['api_endpoint'], $args );
+
+	if ( is_wp_error( $request ) ) {
+
+		$success   = false;
+		$error_msg = $request->get_error_message();
+
+	} else {
+
+		$body    = wp_remote_retrieve_body( $request );
+		$code    = wp_remote_retrieve_response_code( $request );
+		$message = wp_remote_retrieve_response_message( $request );
+		if( is_string( $body ) ) {
+			wp_parse_str( $body, $body );
+		}
+
+		if( empty( $code ) || 200 !== (int) $code ) {
+			$success = false;
+		}
+
+		if( empty( $message ) || 'OK' !== $message ) {
+			$success = false;
+		}
+
+		if( isset( $body['ACK'] ) && 'success' === strtolower( $body['ACK'] ) ) {
+			$success = true;
+		} else {
+			$success = false;
+			if( isset( $body['L_LONGMESSAGE0'] ) ) {
+				$error_msg = $body['L_LONGMESSAGE0'];
+			} else {
+				$error_msg = __( 'PayPal refund failed for unknown reason.', 'easy-digital-downloads' );
+			}
+		}
+
+	}
+
+	if( $success ) {
+
+		// Prevents the PayPal Express one-time gateway from trying to process the refundl
+		$payment->update_meta( '_edd_paypal_refunded', true );
+		$payment->add_note( sprintf( __( 'PayPal refund transaction ID: %s', 'easy-digital-downloads' ), $body['REFUNDTRANSACTIONID'] ) );
+
+	} else {
+
+		$payment->add_note( sprintf( __( 'PayPal refund failed: %s', 'easy-digital-downloads' ), $error_msg ) );
+
+	}
+
+	// Run hook letting people know the payment has been refunded successfully.
+	do_action( 'edd_paypal_refund_purchase', $payment );
+}

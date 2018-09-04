@@ -44,7 +44,6 @@ class EDD_Tools_Recount_All_Stats extends EDD_Batch_Export {
 	/**
 	 * Get the Export Data
 	 *
-	 * @access public
 	 * @since 2.5
 	 * @global object $wpdb Used to query the database using the WordPress
 	 *   Database API
@@ -121,8 +120,20 @@ class EDD_Tools_Recount_All_Stats extends EDD_Batch_Export {
 						);
 					}
 
+					$amount = $item['price'];
+					if ( ! empty( $item['fees'] ) ) {
+						foreach ( $item['fees'] as $fee ) {
+							// Only let negative fees affect earnings
+							if ( $fee['amount'] > 0  ) {
+								continue;
+							}
+
+							$amount += $fee['amount'];
+						}
+					}
+
 					$totals[ $download_id ]['sales']++;
-					$totals[ $download_id ]['earnings'] += $item['price'];
+					$totals[ $download_id ]['earnings'] += $amount;
 
 				}
 
@@ -214,7 +225,7 @@ class EDD_Tools_Recount_All_Stats extends EDD_Batch_Export {
 	public function headers() {
 		ignore_user_abort( true );
 
-		if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+		if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 			set_time_limit( 0 );
 		}
 	}
@@ -222,7 +233,6 @@ class EDD_Tools_Recount_All_Stats extends EDD_Batch_Export {
 	/**
 	 * Perform the export
 	 *
-	 * @access public
 	 * @since 2.5
 	 * @return void
 	 */
@@ -268,6 +278,13 @@ class EDD_Tools_Recount_All_Stats extends EDD_Batch_Export {
 
 				$all_downloads = get_posts( $args );
 				$this->store_data( 'edd_temp_download_ids', $all_downloads );
+
+				if ( $this->step == 1 ) {
+					foreach ( $all_downloads as $download ) {
+						update_post_meta( $download, '_edd_download_sales'   , 0 );
+						update_post_meta( $download, '_edd_download_earnings', 0 );
+					}
+				}
 			}
 
 			$args  = apply_filters( 'edd_recount_download_stats_total_args', array(
@@ -324,7 +341,16 @@ class EDD_Tools_Recount_All_Stats extends EDD_Batch_Export {
 		global $wpdb;
 		$value = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM $wpdb->options WHERE option_name = '%s'", $key ) );
 
-		return empty( $value ) ? false : maybe_unserialize( $value );
+		if ( empty( $value ) ) {
+			return false;
+		}
+
+		$maybe_json = json_decode( $value );
+		if ( ! is_null( $maybe_json ) ) {
+			$value = json_decode( $value, true );
+		}
+
+		return $value;
 	}
 
 	/**
@@ -338,7 +364,7 @@ class EDD_Tools_Recount_All_Stats extends EDD_Batch_Export {
 	private function store_data( $key, $value ) {
 		global $wpdb;
 
-		$value = maybe_serialize( $value );
+		$value = is_array( $value ) ? wp_json_encode( $value ) : esc_attr( $value );
 
 		$data = array(
 			'option_name'  => $key,

@@ -55,9 +55,7 @@ function edd_register_form( $redirect = '' ) {
 
 	ob_start();
 
-	if( ! is_user_logged_in() ) {
-		edd_get_template_part( 'shortcode', 'register' );
-	}
+	edd_get_template_part( 'shortcode', 'register' );
 
 	return apply_filters( 'edd_register_form', ob_get_clean() );
 }
@@ -78,8 +76,16 @@ function edd_process_login_form( $data ) {
 		if ( $user_data ) {
 			$user_ID = $user_data->ID;
 			$user_email = $user_data->user_email;
+
 			if ( wp_check_password( $data['edd_user_pass'], $user_data->user_pass, $user_data->ID ) ) {
-				edd_log_user_in( $user_data->ID, $data['edd_user_login'], $data['edd_user_pass'] );
+
+				if ( isset( $data['rememberme'] ) ) {
+					$data['rememberme'] = true;
+				} else {
+					$data['rememberme'] = false;
+				}
+
+				edd_log_user_in( $user_data->ID, $data['edd_user_login'], $data['edd_user_pass'], $data['rememberme'] );
 			} else {
 				edd_set_error( 'password_incorrect', __( 'The password you entered is incorrect', 'easy-digital-downloads' ) );
 			}
@@ -104,13 +110,14 @@ add_action( 'edd_user_login', 'edd_process_login_form' );
  * @param int $user_id User ID
  * @param string $user_login Username
  * @param string $user_pass Password
+ * @param boolean $remember Remember me
  * @return void
 */
-function edd_log_user_in( $user_id, $user_login, $user_pass ) {
+function edd_log_user_in( $user_id, $user_login, $user_pass, $remember = false ) {
 	if ( $user_id < 1 )
 		return;
 
-	wp_set_auth_cookie( $user_id );
+	wp_set_auth_cookie( $user_id, $remember );
 	wp_set_current_user( $user_id, $user_login );
 	do_action( 'wp_login', $user_login, get_userdata( $user_id ) );
 	do_action( 'edd_log_user_in', $user_id, $user_login, $user_pass );

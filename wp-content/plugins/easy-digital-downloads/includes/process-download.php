@@ -75,20 +75,50 @@ function edd_process_download() {
 		// Payment has been verified, setup the download
 		$download_files = edd_get_download_files( $args['download'] );
 		$attachment_id  = ! empty( $download_files[ $args['file_key'] ]['attachment_id'] ) ? absint( $download_files[ $args['file_key'] ]['attachment_id'] ) : false;
+		$thumbnail_size = ! empty( $download_files[ $args['file_key'] ]['thumbnail_size'] ) ? sanitize_text_field( $download_files[ $args['file_key'] ]['thumbnail_size'] ) : false;
+		$requested_file = isset( $download_files[ $args['file_key'] ]['file'] ) ? $download_files[ $args['file_key'] ]['file'] : '';
 
 		/*
 		 * If we have an attachment ID stored, use get_attached_file() to retrieve absolute URL
 		 * If this fails or returns a relative path, we fail back to our own absolute URL detection
 		 */
-		if( $attachment_id && 'attachment' == get_post_type( $attachment_id ) ) {
+		if( edd_is_local_file( $requested_file ) && $attachment_id && 'attachment' == get_post_type( $attachment_id ) ) {
+
+			if( 'pdf' === strtolower( edd_get_file_extension( $requested_file ) ) ) {
+				// Do not ever grab the thumbnail for PDFs. See https://github.com/easydigitaldownloads/easy-digital-downloads/issues/5491
+				$thumbnail_size = false;
+			}
 
 			if( 'redirect' == $method ) {
 
-				$attached_file = wp_get_attachment_url( $attachment_id );
+				if ( $thumbnail_size ) {
+					$attached_file = wp_get_attachment_image_url( $attachment_id, $thumbnail_size, false );
+				} else {
+					$attached_file = wp_get_attachment_url( $attachment_id );
+				}
 
 			} else {
 
-				$attached_file = get_attached_file( $attachment_id, false );
+				if ( $thumbnail_size ) {
+
+					$attachment_data = wp_get_attachment_image_src( $attachment_id, $thumbnail_size, false );
+
+					if ( false !== $attachment_data && ! empty( $attachment_data[0] ) && filter_var( $attachment_data[0], FILTER_VALIDATE_URL) !== false ) {
+						$attached_file  = $attachment_data['0'];
+						$attached_file  = str_replace( site_url(), '', $attached_file );
+						$attached_file  = realpath( ABSPATH . $attached_file );
+					}
+
+				}
+
+				if ( empty( $attached_file ) ) {
+					$attached_file = get_attached_file( $attachment_id, false );
+				}
+
+				// Confirm the file exists
+				if( ! file_exists( $attached_file ) ) {
+					$attached_file = false;
+				}
 
 			}
 
@@ -100,15 +130,38 @@ function edd_process_download() {
 
 		}
 
-		// If we didn't find a file from the attachment, grab the given URL
-		if( ! isset( $requested_file ) ) {
+		// Allow the file to be altered before any headers are sent
+		$requested_file = apply_filters( 'edd_requested_file', $requested_file, $download_files, $args['file_key'] );
 
-			$requested_file = isset( $download_files[ $args['file_key'] ]['file'] ) ? $download_files[ $args['file_key'] ]['file'] : '';
+		if( 'x_sendfile' == $method && ( ! function_exists( 'apache_get_modules' ) || ! in_array( 'mod_xsendfile', apache_get_modules() ) ) ) {
+			// If X-Sendfile is selected but is not supported, fallback to Direct
+			$method = 'direct';
+		}
+
+		$file_details = parse_url( $requested_file );
+		$schemes      = array( 'http', 'https' ); // Direct URL schemes
+
+		$supported_streams = stream_get_wrappers();
+		if ( strtoupper( substr( PHP_OS, 0, 3 ) ) !== 'WIN' && isset( $file_details['scheme'] ) && ! in_array( $file_details['scheme'], $supported_streams ) ) {
+			wp_die( __( 'Error downloading file. Please contact support.', 'easy-digital-downloads' ), __( 'File download error', 'easy-digital-downloads' ), 501 );
+		}
+
+		if ( ( ! isset( $file_details['scheme'] ) || ! in_array( $file_details['scheme'], $schemes ) ) && isset( $file_details['path'] ) && file_exists( $requested_file ) ) {
+
+			/**
+			 * Download method is set to Redirect in settings but an absolute path was provided
+			 * We need to switch to a direct download in order for the file to download properly
+			 */
+			$method = 'direct';
 
 		}
 
-		// Allow the file to be altered before any headers are sent
-		$requested_file = apply_filters( 'edd_requested_file', $requested_file, $download_files, $args['file_key'] );
+		/**
+		 * Allow extensions to run actions prior to recording the file download log entry
+		 *
+		 * @since 2.6.14
+		 */
+		do_action( 'edd_process_download_pre_record_log', $requested_file, $args, $method );
 
 		// Record this file download in the log
 		$user_info = array();
@@ -124,7 +177,7 @@ function edd_process_download() {
 		$file_extension = edd_get_file_extension( $requested_file );
 		$ctype          = edd_get_file_ctype( $file_extension );
 
-		if ( ! edd_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
+		if ( ! edd_is_func_disabled( 'set_time_limit' ) ) {
 			@set_time_limit(0);
 		}
 		if ( function_exists( 'get_magic_quotes_runtime' ) && get_magic_quotes_runtime() && version_compare( phpversion(), '5.4', '<' ) ) {
@@ -143,31 +196,13 @@ function edd_process_download() {
 		header("Robots: none");
 		header("Content-Type: " . $ctype . "");
 		header("Content-Description: File Transfer");
-		header("Content-Disposition: attachment; filename=\"" . apply_filters( 'edd_requested_file_name', basename( $requested_file ) ) . "\"");
+		header("Content-Disposition: attachment; filename=\"" . apply_filters( 'edd_requested_file_name', basename( $requested_file ), $args ) . "\"");
 		header("Content-Transfer-Encoding: binary");
 
 		// If the file isn't locally hosted, process the redirect
 		if ( filter_var( $requested_file, FILTER_VALIDATE_URL ) && ! edd_is_local_file( $requested_file ) ) {
 			edd_deliver_download( $requested_file, true );
 			exit;
-		}
-
-		if( 'x_sendfile' == $method && ( ! function_exists( 'apache_get_modules' ) || ! in_array( 'mod_xsendfile', apache_get_modules() ) ) ) {
-			// If X-Sendfile is selected but is not supported, fallback to Direct
-			$method = 'direct';
-		}
-
-		$file_details = parse_url( $requested_file );
-		$schemes      = array( 'http', 'https' ); // Direct URL schemes
-
-		if ( ( ! isset( $file_details['scheme'] ) || ! in_array( $file_details['scheme'], $schemes ) ) && isset( $file_details['path'] ) && file_exists( $requested_file ) ) {
-
-			/**
-			 * Download method is seto to Redirect in settings but an absolute path was provided
-			 * We need to switch to a direct download in order for the file to download properly
-			 */
-			$method = 'direct';
-
 		}
 
 		switch( $method ) :
@@ -218,7 +253,7 @@ function edd_process_download() {
 				}
 
 				// Set the file size header
-				header( "Content-Length: " . filesize( $file_path ) );
+				header( "Content-Length: " . @filesize( $file_path ) );
 
 				// Now deliver the file based on the kind of software the server is running / has enabled
 				if ( stristr( getenv( 'SERVER_SOFTWARE' ), 'lighttpd' ) ) {
@@ -227,9 +262,13 @@ function edd_process_download() {
 
 				} elseif ( $direct && ( stristr( getenv( 'SERVER_SOFTWARE' ), 'nginx' ) || stristr( getenv( 'SERVER_SOFTWARE' ), 'cherokee' ) ) ) {
 
-					// We need a path relative to the domain
-					$file_path = str_ireplace( realpath( $_SERVER['DOCUMENT_ROOT'] ), '', $file_path );
-					header( "X-Accel-Redirect: /$file_path" );
+					$ignore_x_accel_redirect_header = apply_filters( 'edd_ignore_x_accel_redirect', false );
+
+					if ( ! $ignore_x_accel_redirect_header ) {
+						// We need a path relative to the domain
+						$file_path = str_ireplace( realpath( $_SERVER['DOCUMENT_ROOT'] ), '', $file_path );
+						header( "X-Accel-Redirect: /$file_path" );
+					}
 
 				}
 
@@ -263,7 +302,6 @@ add_action( 'init', 'edd_process_download', 100 );
  *
  * If enabled, the file is symlinked to better support large file downloads
  *
- * @access   public
  * @param    string    $file
  * @param    bool      $redirect True if we should perform a header redirect instead of calling edd_readfile_chunked()
  * @return   void
@@ -332,7 +370,7 @@ function edd_deliver_download( $file = '', $redirect = false ) {
  */
 function edd_is_local_file( $requested_file ) {
 	$home_url       = preg_replace('#^https?://#', '', home_url() );
-	$requested_file = preg_replace('#^https?://#', '', $requested_file );
+	$requested_file = preg_replace('#^(https?|file)://#', '', $requested_file );
 
 	$is_local_url  = strpos( $requested_file, $home_url ) === 0;
 	$is_local_path = strpos( $requested_file, '/' ) === 0;
@@ -387,7 +425,6 @@ function edd_get_local_path_from_url( $url ) {
 /**
  * Get the file content type
  *
- * @access   public
  * @param    string    file extension
  * @return   string
  */
@@ -697,34 +734,91 @@ function edd_get_file_ctype( $extension ) {
  * Reads file in chunks so big downloads are possible without changing PHP.INI
  * See http://codeigniter.com/wiki/Download_helper_for_large_files/
  *
- * @access   public
- * @param    string  $file      The file
- * @param    boolean $retbytes  Return the bytes of file
+ * @param    string  $file     The file
+ * @param    boolean $retbytes Return the bytes of file
+ *
  * @return   bool|string        If string, $status || $cnt
  */
 function edd_readfile_chunked( $file, $retbytes = true ) {
+	while ( ob_get_level() > 0 ) {
+		ob_end_clean();
+	}
+
+	ob_start();
+
+	// If output buffers exist, make sure they are closed. See https://github.com/easydigitaldownloads/easy-digital-downloads/issues/6387
+	if ( ob_get_length() ) {
+		ob_clean();
+	}
 
 	$chunksize = 1024 * 1024;
 	$buffer    = '';
 	$cnt       = 0;
-	$handle    = @fopen( $file, 'r' );
+	$handle    = @fopen( $file, 'rb' );
 
 	if ( $size = @filesize( $file ) ) {
-		header("Content-Length: " . $size );
+		header( "Content-Length: " . $size );
 	}
 
 	if ( false === $handle ) {
 		return false;
 	}
 
+	if ( isset( $_SERVER['HTTP_RANGE'] ) ) {
+		list( $size_unit, $range ) = explode( '=', $_SERVER['HTTP_RANGE'], 2 );
+		if ( 'bytes' === $size_unit ) {
+			if ( strpos( ',', $range ) ) {
+				list( $range ) = explode( ',', $range, 1 );
+			}
+		} else {
+			$range = '';
+			header( 'HTTP/1.1 416 Requested Range Not Satisfiable' );
+			exit;
+		}
+	} else {
+		$range = '';
+	}
+
+	if ( empty( $range ) ) {
+		$seek_start = null;
+		$seek_end   = null;
+	} else {
+		list( $seek_start, $seek_end ) = explode( '-', $range, 2 );
+	}
+
+	$seek_end   = ( empty( $seek_end ) ) ? ( $size - 1 ) : min( abs( intval( $seek_end ) ), ( $size - 1 ) );
+	$seek_start = ( empty( $seek_start ) || $seek_end < abs( intval( $seek_start ) ) ) ? 0 : max( abs( intval( $seek_start ) ), 0 );
+
+	// Only send partial content header if downloading a piece of the file (IE workaround)
+	if ( $seek_start > 0 || $seek_end < ( $size - 1 ) ) {
+		header( 'HTTP/1.1 206 Partial Content' );
+		header( 'Content-Range: bytes ' . $seek_start . '-' . $seek_end . '/' . $size );
+		header( 'Content-Length: ' . ( $seek_end - $seek_start + 1 ) );
+	} else {
+		header( "Content-Length: $size" );
+	}
+
+	header( 'Accept-Ranges: bytes' );
+
+	set_time_limit( 0 );
+	fseek( $handle, $seek_start );
+
 	while ( ! @feof( $handle ) ) {
 		$buffer = @fread( $handle, $chunksize );
 		echo $buffer;
+		ob_flush();
 
 		if ( $retbytes ) {
 			$cnt += strlen( $buffer );
 		}
+
+		if ( connection_status() != 0 ) {
+			@fclose( $handle );
+			exit;
+		}
 	}
+
+	ob_flush();
 
 	$status = @fclose( $handle );
 
@@ -739,8 +833,8 @@ function edd_readfile_chunked( $file, $retbytes = true ) {
  * Used to process an old URL format for downloads
  *
  * @since  2.3
- * @param  array $args Arguements provided to download a file
- * @return array       Same arguements, with the status of verification added
+ * @param  array $args Arguments provided to download a file
+ * @return array       Same arguments, with the status of verification added
  */
 function edd_process_legacy_download_url( $args ) {
 
@@ -760,8 +854,8 @@ function edd_process_legacy_download_url( $args ) {
  * Used to process a signed URL for processing downloads
  *
  * @since  2.3
- * @param  array $args Arguements provided to download a file
- * @return array       Same arguements, with the status of verification added
+ * @param  array $args Arguments provided to download a file
+ * @return array       Same arguments, with the status of verification added
  */
 function edd_process_signed_download_url( $args ) {
 
@@ -792,8 +886,8 @@ function edd_process_signed_download_url( $args ) {
 	$args['payment']     = $order_parts[0];
 	$args['file_key']    = $order_parts[2];
 	$args['price_id']    = $order_parts[3];
-	$args['email']       = get_post_meta( $order_parts[0], '_edd_payment_user_email', true );
-	$args['key']         = get_post_meta( $order_parts[0], '_edd_payment_purchase_key', true );
+	$args['email']       = edd_get_payment_meta( $order_parts[0], '_edd_payment_user_email', true );
+	$args['key']         = edd_get_payment_meta( $order_parts[0], '_edd_payment_purchase_key', true );
 
 	$payment = new EDD_Payment( $args['payment'] );
 	$args['has_access']  = 'publish' === $payment->status ? true : false;
@@ -838,3 +932,53 @@ function edd_set_requested_file_scheme( $requested_file, $download_files, $file_
 
 }
 add_filter( 'edd_requested_file', 'edd_set_requested_file_scheme', 10, 3 );
+
+/**
+ * Perform a head request on file URLs before attempting to download to check if they are accessible.
+ *
+ * @since  2.6.14
+ * @param  string $requested_file The Requested File
+ * @param  array  $args           Arguments
+ * @param  string $method         The download mehtod being sed
+ * @return void
+ */
+function edd_check_file_url_head( $requested_file, $args, $method ) {
+
+	// If this is a file URL (not a path), perform a head request to determine if it's valid
+	if( filter_var( $requested_file, FILTER_VALIDATE_URL ) && ! edd_is_local_file( $requested_file ) ) {
+
+		$valid   = true;
+		$request = wp_remote_head( $requested_file );
+
+		if( is_wp_error( $request ) ) {
+
+			$valid   = false;
+			$message = $request;
+			$title   = __( 'Invalid file', 'easy-digital-downloads' );
+
+		}
+
+		if( 404 === wp_remote_retrieve_response_code( $request ) ) {
+
+			$valid   = false;
+			$message = __( 'The requested file could not be found. Error 404.', 'easy-digital-downloads' );
+			$title   = __( 'File not found', 'easy-digital-downloads' );
+
+		}
+
+		if( ! $valid ) {
+
+			do_action( 'edd_check_file_url_head_invalid', $requested_file, $args, $method );
+			wp_die( $message, $title, array( 'response' => 403 ) );
+
+		}
+
+	}
+
+}
+/**
+ * Filter removed in EDD 2.7
+ *
+ * @see https://github.com/easydigitaldownloads/easy-digital-downloads/issues/5450
+ */
+// add_action( 'edd_process_download_pre_record_log', 'edd_check_file_url_head', 10, 3 );

@@ -30,7 +30,7 @@ class EDD_API {
 	/**
 	 * Latest API Version
 	 */
-	const VERSION = 1;
+	const VERSION = 2;
 
 	/**
 	 * Pretty Print?
@@ -98,7 +98,6 @@ class EDD_API {
 	 * Version of the API queried
 	 *
 	 * @var string
-	 * @access public
 	 * @since 2.4
 	 */
 	private $queried_version;
@@ -107,7 +106,6 @@ class EDD_API {
 	 * All versions of the API
 	 *
 	 * @var string
-	 * @access public
 	 * @since 2.4
 	 */
 	protected $versions = array();
@@ -116,7 +114,6 @@ class EDD_API {
 	 * Queried endpoint
 	 *
 	 * @var string
-	 * @access public
 	 * @since 2.4
 	 */
 	private $endpoint;
@@ -125,7 +122,6 @@ class EDD_API {
 	 * Endpoints routes
 	 *
 	 * @var object
-	 * @access public
 	 * @since 2.4
 	 */
 	private $routes;
@@ -140,6 +136,7 @@ class EDD_API {
 
 		$this->versions = array(
 			'v1' => 'EDD_API_V1',
+			'v2' => 'EDD_API_V2'
 		);
 
 		foreach( $this->get_versions() as $version => $class ) {
@@ -149,20 +146,13 @@ class EDD_API {
 		add_action( 'init',                     array( $this, 'add_endpoint'     ) );
 		add_action( 'wp',                       array( $this, 'process_query'    ), -1 );
 		add_filter( 'query_vars',               array( $this, 'query_vars'       ) );
-		add_action( 'show_user_profile',        array( $this, 'user_key_field'   ) );
-		add_action( 'edit_user_profile',        array( $this, 'user_key_field'   ) );
-		add_action( 'personal_options_update',  array( $this, 'update_key'       ) );
-		add_action( 'edit_user_profile_update', array( $this, 'update_key'       ) );
 		add_action( 'edd_process_api_key',      array( $this, 'process_api_key'  ) );
 
-		// Setup a backwards compatibilty check for user API Keys
+		// Setup a backwards compatibility check for user API Keys
 		add_filter( 'get_user_metadata',        array( $this, 'api_key_backwards_copmat' ), 10, 4 );
 
 		// Determine if JSON_PRETTY_PRINT is available
 		$this->pretty_print = defined( 'JSON_PRETTY_PRINT' ) ? JSON_PRETTY_PRINT : null;
-
-		// Allow API request logging to be turned off
-		$this->log_requests = apply_filters( 'edd_api_log_requests', $this->log_requests );
 
 		// Setup EDD_Stats instance
 		$this->stats = new EDD_Payment_Stats;
@@ -172,7 +162,6 @@ class EDD_API {
 	/**
 	 * Registers a new rewrite endpoint for accessing the API
 	 *
-	 * @access public
 	 * @author Daniel J Griffiths
 	 * @param array $rewrite_rules WordPress Rewrite Rules
 	 * @since 1.5
@@ -184,7 +173,6 @@ class EDD_API {
 	/**
 	 * Registers query vars for API access
 	 *
-	 * @access public
 	 * @since 1.5
 	 * @author Daniel J Griffiths
 	 * @param array $vars Query vars
@@ -197,6 +185,9 @@ class EDD_API {
 		$vars[] = 'query';
 		$vars[] = 'type';
 		$vars[] = 'product';
+		$vars[] = 'category';
+		$vars[] = 'tag';
+		$vars[] = 'term_relation';
 		$vars[] = 'number';
 		$vars[] = 'date';
 		$vars[] = 'startdate';
@@ -207,6 +198,7 @@ class EDD_API {
 		$vars[] = 'id';
 		$vars[] = 'purchasekey';
 		$vars[] = 'email';
+		$vars[] = 'info';
 
 		return $vars;
 	}
@@ -214,7 +206,6 @@ class EDD_API {
 	/**
 	 * Retrieve the API versions
 	 *
-	 * @access public
 	 * @since 2.4
 	 * @return array
 	 */
@@ -225,7 +216,6 @@ class EDD_API {
 	/**
 	 * Retrieve the API version that was queried
 	 *
-	 * @access public
 	 * @since 2.4
 	 * @return string
 	 */
@@ -303,7 +293,7 @@ class EDD_API {
 	 * @uses EDD_API::invalid_key()
 	 * @uses EDD_API::invalid_auth()
 	 * @since 1.5
-	 * @return void
+	 * @return bool
 	 */
 	private function validate_request() {
 		global $wp_query;
@@ -311,10 +301,11 @@ class EDD_API {
 		$this->override = false;
 
 		// Make sure we have both user and api key
-		if ( ! empty( $wp_query->query_vars['edd-api'] ) && ( $wp_query->query_vars['edd-api'] != 'products' || ! empty( $wp_query->query_vars['token'] ) ) ) {
+		if ( ! empty( $wp_query->query_vars['edd-api'] ) && ( ! $this->is_public_query() || ! empty( $wp_query->query_vars['token'] ) ) ) {
 
 			if ( empty( $wp_query->query_vars['token'] ) || empty( $wp_query->query_vars['key'] ) ) {
 				$this->missing_auth();
+				return  false;
 			}
 
 			// Auth was provided, include the upgrade routine so we can use the fallback api checks
@@ -324,6 +315,7 @@ class EDD_API {
 			if ( ! ( $user = $this->get_user( $wp_query->query_vars['key'] ) ) ) {
 
 				$this->invalid_key();
+				return  false;
 
 			} else {
 
@@ -331,13 +323,16 @@ class EDD_API {
 				$secret = $this->get_user_secret_key( $user );
 				$public = urldecode( $wp_query->query_vars['key'] );
 
-				if ( hash_equals( md5( $secret . $public ), $token ) ) {
+				$valid = $this->check_keys( $secret, $public, $token );
+				if ( $valid ) {
 					$this->is_valid_request = true;
 				} else {
 					$this->invalid_auth();
+					return  false;
 				}
+
 			}
-		} elseif ( ! empty( $wp_query->query_vars['edd-api'] ) && $wp_query->query_vars['edd-api'] == 'products' ) {
+		} elseif ( ! empty( $wp_query->query_vars['edd-api'] ) && $this->is_public_query() ) {
 			$this->is_valid_request = true;
 			$wp_query->set( 'key', 'public' );
 		}
@@ -345,9 +340,26 @@ class EDD_API {
 	}
 
 	/**
+	 * Return whether this is a public query.
+	 *
+	 * @access private
+	 * @global object $wp_query WordPress Query
+	 * @since 2.6
+	 * @return boolean
+	 */
+	private function is_public_query() {
+		global $wp_query;
+
+	    $public_modes = apply_filters( 'edd_api_public_query_modes', array(
+	        'products'
+	    ) );
+
+	    return in_array( $wp_query->query_vars['edd-api'], $public_modes );
+	}
+
+	/**
 	 * Retrieve the user ID based on the public key provided
 	 *
-	 * @access public
 	 * @since 1.5.1
 	 * @global object $wpdb Used to query the database using the WordPress
 	 * Database API
@@ -501,8 +513,6 @@ class EDD_API {
 	/**
 	 * Listens for the API and then processes the API requests
 	 *
-	 * @access public
-	 * @author Daniel J Griffiths
 	 * @global $wp_query
 	 * @since 1.5
 	 * @return void
@@ -550,24 +560,35 @@ class EDD_API {
 					'product'   => isset( $wp_query->query_vars['product'] )   ? $wp_query->query_vars['product']   : null,
 					'date'      => isset( $wp_query->query_vars['date'] )      ? $wp_query->query_vars['date']      : null,
 					'startdate' => isset( $wp_query->query_vars['startdate'] ) ? $wp_query->query_vars['startdate'] : null,
-					'enddate'   => isset( $wp_query->query_vars['enddate'] )   ? $wp_query->query_vars['enddate']   : null
+					'enddate'   => isset( $wp_query->query_vars['enddate'] )   ? $wp_query->query_vars['enddate']   : null,
 				) );
 
 				break;
 
 			case 'products' :
 
-				$product = isset( $wp_query->query_vars['product'] )   ? $wp_query->query_vars['product']   : null;
+				$args = array(
+					'product'       => isset( $wp_query->query_vars['product'] )       ? absint( $wp_query->query_vars['product'] )                             : null,
+					'category'      => isset( $wp_query->query_vars['category'] )      ? $this->sanitize_request_term( $wp_query->query_vars['category'] )      : null,
+					'tag'           => isset( $wp_query->query_vars['tag'] )           ? $this->sanitize_request_term( $wp_query->query_vars['tag'] )           : null,
+					'term_relation' => isset( $wp_query->query_vars['term_relation'] ) ? $this->sanitize_request_term( $wp_query->query_vars['term_relation'] ) : null,
+					's'             => isset( $wp_query->query_vars['s'] )             ? sanitize_text_field( $wp_query->query_vars['s'] )                      : null,
+				);
 
-				$data = $this->routes->get_products( $product );
+				$data = $this->routes->get_products( $args );
 
 				break;
 
 			case 'customers' :
 
-				$customer = isset( $wp_query->query_vars['customer'] ) ? $wp_query->query_vars['customer']  : null;
+				$args = array(
+					'customer'  => isset( $wp_query->query_vars['customer'] )  ? $wp_query->query_vars['customer']  : null,
+					'date'      => isset( $wp_query->query_vars['date'] )      ? $wp_query->query_vars['date']      : null,
+					'startdate' => isset( $wp_query->query_vars['startdate'] ) ? $wp_query->query_vars['startdate'] : null,
+					'enddate'   => isset( $wp_query->query_vars['enddate'] )   ? $wp_query->query_vars['enddate']   : null,
+				);
 
-				$data = $this->routes->get_customers( $customer );
+				$data = $this->routes->get_customers( $args );
 
 				break;
 
@@ -590,6 +611,12 @@ class EDD_API {
 				$customer = isset( $wp_query->query_vars['customer'] ) ? $wp_query->query_vars['customer']  : null;
 
 				$data = $this->get_download_logs( $customer );
+
+				break;
+
+			case 'info' :
+
+				$data = $this->routes->get_info();
 
 				break;
 
@@ -640,6 +667,7 @@ class EDD_API {
 			'sales',
 			'discounts',
 			'file-download-logs',
+			'info'
 		) );
 
 		$query = isset( $wp_query->query_vars['edd-api'] ) ? $wp_query->query_vars['edd-api'] : null;
@@ -697,7 +725,6 @@ class EDD_API {
 	/**
 	 * Sets up the dates used to retrieve earnings/sales
 	 *
-	 * @access public
 	 * @since 1.5.1
 	 * @param array $args Arguments to override defaults
 	 * @return array $dates
@@ -731,21 +758,24 @@ class EDD_API {
 			switch ( $args['date'] ) :
 
 				case 'this_month' :
-					$dates['day']       = null;
+					$dates['day']       = 1;
+					$dates['day_end']   = date( 't', $current_time );
 					$dates['m_start']   = date( 'n', $current_time );
 					$dates['m_end']     = date( 'n', $current_time );
 					$dates['year']      = date( 'Y', $current_time );
 				break;
 
 				case 'last_month' :
-					$dates['day']     = null;
-					$dates['m_start'] = date( 'n', $current_time ) == 1 ? 12 : date( 'n', $current_time ) - 1;
-					$dates['m_end']   = $dates['m_start'];
-					$dates['year']    = date( 'n', $current_time ) == 1 ? date( 'Y', $current_time ) - 1 : date( 'Y', $current_time );
-				break;
+					$dates['day']       = 1;
+					$dates['m_start']   = date( 'n', $current_time ) == 1 ? 12 : date( 'n', $current_time ) - 1;
+					$dates['m_end']     = $dates['m_start'];
+					$dates['year']      = date( 'n', $current_time ) == 1 ? date( 'Y', $current_time ) - 1 : date( 'Y', $current_time );
+					$dates['day_end']   = date( 't', strtotime( $dates['year'] . '-' . $dates['m_start'] . '-' . $dates['day'] ) );
+					break;
 
 				case 'today' :
 					$dates['day']       = date( 'd', $current_time );
+					$dates['day_end']   = date( 'd', $current_time );
 					$dates['m_start']   = date( 'n', $current_time );
 					$dates['m_end']     = date( 'n', $current_time );
 					$dates['year']      = date( 'Y', $current_time );
@@ -775,6 +805,7 @@ class EDD_API {
 					}
 
 					$dates['day']       = $day;
+					$dates['day_end']   = $day;
 					$dates['m_start']   = $month;
 					$dates['m_end']     = $month;
 					$dates['year']      = $year;
@@ -784,7 +815,7 @@ class EDD_API {
 				case 'this_quarter' :
 					$month_now = date( 'n', $current_time );
 
-					$dates['day']           = null;
+					$dates['day']           = 1;
 
 					if ( $month_now <= 3 ) {
 
@@ -811,12 +842,15 @@ class EDD_API {
 						$dates['year']      = date( 'Y', $current_time );
 
 					}
-				break;
+
+					$dates['day_end']   = date( 't', strtotime( $dates['year'] . '-' . $dates['m_end'] ) );
+
+					break;
 
 				case 'last_quarter' :
 					$month_now = date( 'n', $current_time );
 
-					$dates['day']           = null;
+					$dates['day']           = 1;
 
 					if ( $month_now <= 3 ) {
 
@@ -843,20 +877,75 @@ class EDD_API {
 						$dates['year']      = date( 'Y', $current_time );
 
 					}
+
+					$dates['day_end']   = date( 't', strtotime( $dates['year'] . '-' . $dates['m_end'] ) );
 				break;
 
 				case 'this_year' :
-					$dates['day']       = null;
-					$dates['m_start']   = null;
-					$dates['m_end']     = null;
+					$dates['day']       = 1;
+					$dates['m_start']   = 1;
+					$dates['m_end']     = 12;
+					$dates['day_end']   = 31;
 					$dates['year']      = date( 'Y', $current_time );
 				break;
 
 				case 'last_year' :
-					$dates['day']       = null;
-					$dates['m_start']   = null;
-					$dates['m_end']     = null;
+					$dates['day']       = 1;
+					$dates['m_start']   = 1;
+					$dates['m_end']     = 12;
+					$dates['day_end']   = 31;
 					$dates['year']      = date( 'Y', $current_time ) - 1;
+				break;
+
+				case 'this_week' :
+				case 'last_week' :
+					$start_of_week = get_option( 'start_of_week' );
+
+					if ( 'last_week' === $args['date'] ) {
+						$today = date( 'd', $current_time - WEEK_IN_SECONDS );
+					} else {
+						$today = date( 'd', $current_time );
+					}
+
+					$day_of_the_week = date( 'w', $current_time );
+					$month           = date( 'n', $current_time );
+					$year            = date( 'Y', $current_time );
+
+					// Account for a week the spans a month change (including if that week spans over a break in the year).
+					if ( ( $today - $day_of_the_week ) < 1 ) {
+						$start_date     = date( 'd', strtotime( $year . '-' . $month . '-' . $today . ' -' . $day_of_the_week . ' days' ) );
+						$month          = $month > 1 ? $month -- : 12;
+						$adjusted_month = true;
+					} else {
+						$start_date     = $today - $day_of_the_week;
+						$adjusted_month = false;
+					}
+
+					// Account for the WordPress Start of Week setting.
+					$adjusted_start_date = date( 'd', strtotime( $year . '-' . $month . '-' . $start_date . ' +' . $start_of_week . 'days' ) );
+
+					/**
+					 * Account for when the base start of the week is the end of one month, but the WordPress Start of Week setting
+					 * Jumps it to the following month.
+					 */
+					if ( $adjusted_start_date < $start_date ) {
+						if ( 12 === $month ) {
+							$month = 1;
+							$year++;
+						} else {
+							$month++;
+						}
+					}
+
+					$dates['day']        = $adjusted_start_date;
+					$dates['m_start']    = $month;
+					$dates['year']       = $month === 12 && $adjusted_month ? $year - 1 : $year;
+
+					$base_start_date      = $dates['year'] . '-' . $dates['m_start'] . '-' . $dates['day'];
+					$base_start_timestamp = strtotime( $base_start_date . ' +6 days' );
+					$dates['m_end']       = date( 'n', $base_start_timestamp );
+					$dates['day_end']     = date( 'd', $base_start_timestamp );
+					$dates['year_end']    = date( 'Y', $base_start_timestamp );
 				break;
 
 			endswitch;
@@ -875,7 +964,6 @@ class EDD_API {
 	/**
 	 * Process Get Customers API Request
 	 *
-	 * @access public
 	 * @since 1.5
 	 * @author Daniel J Griffiths
 	 * @global object $wpdb Used to query the database using the WordPress
@@ -885,8 +973,10 @@ class EDD_API {
 	 */
 	public function get_customers( $customer = null ) {
 
+		$customer  = is_array( $customer ) ? $customer['customer'] : $customer;
 		$customers = array();
-		$error = array();
+		$error     = array();
+
 		if( ! user_can( $this->user_id, 'view_shop_sensitive_data' ) && ! $this->override ) {
 			return $customers;
 		}
@@ -899,6 +989,17 @@ class EDD_API {
 
 		if( is_numeric( $customer ) ) {
 			$field = 'id';
+		} elseif ( is_array( $customer ) ) {
+			// Checking if search is being done by id, email, user_id fields.
+			if ( array_key_exists( 'id', $customer ) ) {
+				$field = 'id';
+			} elseif ( array_key_exists( 'email', $customer ) ) {
+				$field = 'email';
+			} elseif ( array_key_exists( 'user_id', $customer ) ) {
+				$field = 'user_id';
+			}
+
+			$customer = $customer[ $field ];
 		} else {
 			$field = 'email';
 		}
@@ -943,7 +1044,7 @@ class EDD_API {
 
 				$customers['customers'][$customer_count]['stats']['total_purchases'] = $customer_obj->purchase_count;
 				$customers['customers'][$customer_count]['stats']['total_spent']     = $customer_obj->purchase_value;
-				$customers['customers'][$customer_count]['stats']['total_downloads'] = edd_count_file_downloads_of_user( $customer_obj->email );
+				$customers['customers'][$customer_count]['stats']['total_downloads'] = edd_count_file_downloads_of_customer( $customer_obj->id );
 
 				$customer_count++;
 
@@ -961,32 +1062,38 @@ class EDD_API {
 
 		}
 
-		return $customers;
+		return apply_filters( 'edd_api_customers', $customers, $this );
 	}
 
 	/**
 	 * Process Get Products API Request
 	 *
-	 * @access public
 	 * @author Daniel J Griffiths
 	 * @since 1.5
 	 * @param int $product Product (Download) ID
 	 * @return array $customers Multidimensional array of the products
 	 */
-	public function get_products( $product = null ) {
+	public function get_products( $args = array() ) {
 
 		$products = array();
 		$error = array();
 
-		if ( $product == null ) {
+		if ( empty( $args['product'] ) ) {
+
 			$products['products'] = array();
 
-			$product_list = get_posts( array(
+			$parameters = array(
 				'post_type'        => 'download',
 				'posts_per_page'   => $this->per_page(),
 				'suppress_filters' => true,
-				'paged'            => $this->get_paged()
-			) );
+				'paged'            => $this->get_paged(),
+			);
+
+			if ( isset( $args['s'] ) && !empty( $args['s'] ) ) {
+				$parameters['s'] = $args['s'];
+			}
+
+			$product_list = get_posts( $parameters );
 
 			if ( $product_list ) {
 				$i = 0;
@@ -996,18 +1103,19 @@ class EDD_API {
 				}
 			}
 		} else {
-			if ( get_post_type( $product ) == 'download' ) {
-				$product_info = get_post( $product );
+
+			if ( get_post_type( $args['product'] ) == 'download' ) {
+				$product_info = get_post( $args['product'] );
 
 				$products['products'][0] = $this->get_product_data( $product_info );
 
 			} else {
-				$error['error'] = sprintf( __( 'Product %s not found!', 'easy-digital-downloads' ), $product );
+				$error['error'] = sprintf( __( 'Product %s not found!', 'easy-digital-downloads' ), $args['product'] );
 				return $error;
 			}
 		}
 
-		return $products;
+		return apply_filters( 'edd_api_products', $products, $this );
 	}
 
 	/**
@@ -1017,7 +1125,7 @@ class EDD_API {
 	 * @param  object $product_info The Download Post Object
 	 * @return array                Array of post data to return back in the API
 	 */
-	private function get_product_data( $product_info ) {
+	public function get_product_data( $product_info ) {
 
 		$product = array();
 
@@ -1115,73 +1223,62 @@ class EDD_API {
 						$error['error'] = __( 'Invalid or no date range specified!', 'easy-digital-downloads' );
 					}
 
-					$total = 0;
+					$start_date = $dates['year'] . '-' . $dates['m_start'] . '-' . $dates['day_start'];
+					$end_date = $dates['year_end'] . '-' . $dates['m_end'] . '-' . $dates['day_end'];
 
-					// Loop through the years
-					$y = $dates['year'];
-					while( $y <= $dates['year_end'] ) :
+					$stats = EDD()->payment_stats->get_sales_by_range( 'other', true, $start_date, $end_date );
 
-						if( $dates['year'] == $dates['year_end'] ) {
-							$month_start = $dates['m_start'];
-							$month_end   = $dates['m_end'];
-						} elseif( $y == $dates['year'] && $dates['year_end'] > $dates['year'] ) {
-							$month_start = $dates['m_start'];
-							$month_end   = 12;
-						} elseif( $y == $dates['year_end'] ) {
-							$month_start = 1;
-							$month_end   = $dates['m_end'];
-						} else {
-							$month_start = 1;
-							$month_end   = 12;
+					foreach ( $stats as $sale ) {
+						$key = $sale['y'] . $sale['m'] . $sale['d'];
+						$sales['sales'][ $key ] = (int) $sale['count'];
+					}
+
+					$start_date = date( 'Y-m-d', strtotime( $start_date ) );
+					$end_date = date( 'Y-m-d', strtotime( $end_date ) );
+
+					while ( strtotime( $start_date ) <= strtotime( $end_date ) ) {
+						$d = date( 'd', strtotime( $start_date ) );
+						$m = date( 'm', strtotime( $start_date ) );
+						$y = date( 'Y', strtotime( $start_date ) );
+
+						$key = $y . $m . $d;
+
+						if ( ! isset( $sales['sales'][ $key ] ) ) {
+							$sales['sales'][ $key ] = 0;
 						}
 
-						$i = $month_start;
-						while ( $i <= $month_end ) :
+						$start_date = date( 'Y-m-d', strtotime( '+1 day', strtotime( $start_date ) ) );
+					}
 
-							if( $i == $dates['m_start'] ) {
-								$d = $dates['day_start'];
-							} else {
-								$d = 1;
-							}
+					ksort( $sales['sales'] );
 
-							if( $i == $dates['m_end'] ) {
-								$num_of_days = $dates['day_end'];
-							} else {
-								$num_of_days 	= cal_days_in_month( CAL_GREGORIAN, $i, $y );
-							}
-
-							while ( $d <= $num_of_days ) :
-								$sale_count = edd_get_sales_by_date( $d, $i, $y );
-								$date_key   = date( 'Ymd', strtotime( $y . '/' . $i . '/' . $d ) );
-								if ( ! isset( $sales['sales'][ $date_key ] ) ) {
-									$sales['sales'][ $date_key ] = 0;
-								}
-								$sales['sales'][ $date_key ] += $sale_count;
-								$total += $sale_count;
-								$d++;
-							endwhile;
-							$i++;
-						endwhile;
-
-						$y++;
-					endwhile;
-
-					$sales['totals'] = $total;
+					$sales['totals'] = array_sum( $sales['sales'] );
 				} else {
-					if( $args['date'] == 'this_quarter' || $args['date'] == 'last_quarter'  ) {
-						$sales_count = 0;
+					$start_date = $dates['year'] . '-' . $dates['m_start'] . '-' . $dates['day'];
+					$end_date   = $dates['year'] . '-' . $dates['m_end'] . '-' . $dates['day_end'];
 
-						// Loop through the months
-						$month = $dates['m_start'];
+					$stats = EDD()->payment_stats->get_sales_by_range( $args['date'], false, $start_date, $end_date );
+					if ( $stats instanceof WP_Error ) {
 
-						while( $month <= $dates['m_end'] ) :
-							$sales_count += edd_get_sales_by_date( null, $month, $dates['year'] );
-							$month++;
-						endwhile;
+						$error_message = __( 'There was an error retrieving earnings.', 'easy-digital-downloads' );
 
-						$sales['sales'][ $args['date'] ] = $sales_count;
+						foreach ( $stats->errors as $error_key => $error_array ) {
+							if ( ! empty( $error_array[0] ) ) {
+								$error_message = $error_array[0];
+							}
+						}
+
+						$error['error'] = sprintf( '%s %s', $error_message, $args['date'] );
 					} else {
-						$sales['sales'][ $args['date'] ] = edd_get_sales_by_date( $dates['day'], $dates['m_start'], $dates['year'] );
+						if ( empty( $stats ) ) {
+							$sales['sales'][ $args['date'] ] = 0;
+						} else {
+							$total_sales = 0;
+							foreach( $stats as $date ) {
+								$total_sales += (int) $date['count'];
+							}
+							$sales['sales'][ $args['date'] ] = $total_sales;
+						}
 					}
 				}
 			} elseif ( $args['product'] == 'all' ) {
@@ -1203,7 +1300,7 @@ class EDD_API {
 			if ( ! empty( $error ) )
 				return $error;
 
-			return $sales;
+			return apply_filters( 'edd_api_stats_sales', $sales, $this );
 		} elseif ( $args['type'] == 'earnings' ) {
 			if ( $args['product'] == null ) {
 				if ( $args['date'] == null ) {
@@ -1224,73 +1321,80 @@ class EDD_API {
 					$total = (float) 0.00;
 
 					// Loop through the years
-					$y = $dates['year'];
 					if ( ! isset( $earnings['earnings'] ) ) {
 						$earnings['earnings'] = array();
 					}
-					while( $y <= $dates['year_end'] ) :
 
-						if( $dates['year'] == $dates['year_end'] ) {
-							$month_start = $dates['m_start'];
-							$month_end   = $dates['m_end'];
-						} elseif( $y == $dates['year'] && $dates['year_end'] > $dates['year'] ) {
-							$month_start = $dates['m_start'];
-							$month_end   = 12;
-						} elseif( $y == $dates['year_end'] ) {
-							$month_start = 1;
-							$month_end   = $dates['m_end'];
-						} else {
-							$month_start = 1;
-							$month_end   = 12;
+					if ( cal_days_in_month( CAL_GREGORIAN, $dates['m_start'], $dates['year'] ) < $dates['day_start'] ) {
+						$next_day = mktime( 0, 0, 0, $dates['m_start'] + 1, 1, $dates['year'] );
+						$day = date( 'd', $next_day );
+						$month = date( 'm', $next_day );
+						$year = date( 'Y', $next_day );
+						$date_start = $year . '-' . $month . '-' . $day;
+					} else {
+						$date_start = $dates['year'] . '-' . $dates['m_start'] . '-' . $dates['day_start'];
+					}
+
+					if ( cal_days_in_month( CAL_GREGORIAN, $dates['m_end'], $dates['year'] ) < $dates['day_end'] ) {
+						$date_end = $dates['year_end'] . '-' . $dates['m_end'] . '-' . cal_days_in_month( CAL_GREGORIAN, $dates['m_end'], $dates['year'] );
+					} else {
+						$date_end = $dates['year_end'] . '-' . $dates['m_end'] . '-' . $dates['day_end'];
+					}
+
+					$earnings = EDD()->payment_stats->get_earnings_by_range( 'other', true, $date_start, $date_end );
+
+					$total = 0;
+
+					foreach ( $earnings as $earning ) {
+						$temp_data['earnings'][ $earning['y'] . $earning['m'] . $earning['d'] ] = (float) $earning['total'];
+						$total += (float) $earning['total'];
+					}
+
+					$date_start = date( 'Y-m-d', strtotime( $date_start ) );
+					$date_end = date( 'Y-m-d', strtotime( $date_end ) );
+
+					while ( strtotime( $date_start ) <= strtotime( $date_end ) ) {
+						$d = date( 'd', strtotime( $date_start ) );
+						$m = date( 'm', strtotime( $date_start ) );
+						$y = date( 'Y', strtotime( $date_start ) );
+
+						$key = $y . $m . $d;
+
+						if ( ! isset( $temp_data['earnings'][ $key ] ) ) {
+							$temp_data['earnings'][ $key ] = 0;
 						}
 
-						$i = $month_start;
-						while ( $i <= $month_end ) :
+						$date_start = date( 'Y-m-d', strtotime( '+1 day', strtotime( $date_start ) ) );
+					}
 
-							if( $i == $dates['m_start'] )
-								$d = $dates['day_start'];
-							else
-								$d = 1;
+					ksort($temp_data['earnings']);
 
-							if( $i == $dates['m_end'] ) {
-								$num_of_days = $dates['day_end'];
-							} else {
-								$num_of_days = cal_days_in_month( CAL_GREGORIAN, $i, $y );
-							}
-
-							while ( $d <= $num_of_days ) :
-								$earnings_stat = edd_get_earnings_by_date( $d, $i, $y );
-								$date_key = date( 'Ymd', strtotime( $y . '/' . $i . '/' . $d ) );
-								if ( ! isset( $earnings['earnings'][ $date_key ] ) ) {
-									$earnings['earnings'][ $date_key ] = 0;
-								}
-								$earnings['earnings'][ $date_key ] += $earnings_stat;
-								$total += $earnings_stat;
-								$d++;
-							endwhile;
-
-							$i++;
-						endwhile;
-
-						$y++;
-					endwhile;
+					$earnings = $temp_data;
 
 					$earnings['totals'] = $total;
 				} else {
-					if ( $args['date'] == 'this_quarter' || $args['date'] == 'last_quarter'  ) {
-						$earnings_count = (float) 0.00;
+					$date_start = $dates['year'] . '-' . $dates['m_start'] . '-' . $dates['day'];
+					$date_end   = $dates['year'] . '-' . $dates['m_end'] . '-' . $dates['day_end'];
 
-						// Loop through the months
-						$month = $dates['m_start'];
+					$results = EDD()->payment_stats->get_earnings_by_range( $args['date'], false, $date_start, $date_end );
+					if ( $results instanceof WP_Error ) {
 
-						while ( $month <= $dates['m_end'] ) :
-							$earnings_count += edd_get_earnings_by_date( null, $month, $dates['year'] );
-							$month++;
-						endwhile;
+						$error_message = __( 'There was an error retrieving earnings.', 'easy-digital-downloads' );
 
-						$earnings['earnings'][ $args['date'] ] = $earnings_count;
+						foreach ( $results->errors as $error_key => $error_array ) {
+							if ( ! empty( $error_array[0] ) ) {
+								$error_message = $error_array[0];
+							}
+						}
+
+						$error['error'] = sprintf( '%s %s', $error_message, $args['date'] );
 					} else {
-						$earnings['earnings'][ $args['date'] ] = edd_get_earnings_by_date( $dates['day'], $dates['m_start'], $dates['year'] );
+						$total_earnings = 0;
+						foreach ($results as $result) {
+							$total_earnings += $result['total'];
+						}
+
+						$earnings['earnings'][ $args['date'] ] = edd_format_amount( $total_earnings );
 					}
 				}
 			} elseif ( $args['product'] == 'all' ) {
@@ -1313,31 +1417,30 @@ class EDD_API {
 			if ( ! empty( $error ) )
 				return $error;
 
-			return $earnings;
+			return apply_filters( 'edd_api_stats_earnings', $earnings, $this );
 		} elseif ( $args['type'] == 'customers' ) {
 			if ( version_compare( $edd_version, '2.3', '<' ) || ! edd_has_upgrade_completed( 'upgrade_customer_payments_association' ) ) {
 				global $wpdb;
 				$stats = array();
 				$count = $wpdb->get_col( "SELECT COUNT(DISTINCT meta_value) FROM $wpdb->postmeta WHERE meta_key = '_edd_payment_user_email'" );
 				$stats['customers']['total_customers'] = $count[0];
-				return $stats;
+				return apply_filters( 'edd_api_stats_customers', $stats, $this );
 			} else {
 				$customers = new EDD_DB_Customers();
 				$stats['customers']['total_customers'] = $customers->count();
-				return $stats;
+				return apply_filters( 'edd_api_stats_customers', $stats, $this );
 			}
 		} elseif ( empty( $args['type'] ) ) {
 			$stats = array_merge( $stats, $this->get_default_sales_stats() );
 			$stats = array_merge ( $stats, $this->get_default_earnings_stats() );
 
-			return array( 'stats' => $stats );
+			return apply_filters( 'edd_api_stats', array( 'stats' => $stats, $this ) );
 		}
 	}
 
 	/**
 	 * Retrieves Recent Sales
 	 *
-	 * @access public
 	 * @since  1.5
 	 * @return array
 	 */
@@ -1382,6 +1485,8 @@ class EDD_API {
 				$sales['sales'][ $i ]['total']          = $payment->total;
 				$sales['sales'][ $i ]['gateway']        = $payment->gateway;
 				$sales['sales'][ $i ]['email']          = $payment->email;
+				$sales['sales'][ $i ]['user_id']        = $payment->user_id;
+				$sales['sales'][ $i ]['customer_id']    = $payment->customer_id;
 				$sales['sales'][ $i ]['date']           = $payment->date;
 				$sales['sales'][ $i ]['products']       = array();
 
@@ -1418,13 +1523,12 @@ class EDD_API {
 				$i++;
 			}
 		}
-		return $sales;
+		return apply_filters( 'edd_api_sales', $sales, $this );
 	}
 
 	/**
 	 * Process Get Discounts API Request
 	 *
-	 * @access public
 	 * @since 1.6
 	 * @global object $wpdb Used to query the database using the WordPress
 	 *   Database API
@@ -1504,13 +1608,12 @@ class EDD_API {
 
 		}
 
-		return $discount_list;
+		return apply_filters( 'edd_api_discounts', $discount_list, $this );
 	}
 
 	/**
 	 * Process Get Downloads API Request to retrieve download logs
 	 *
-	 * @access public
 	 * @since 2.5
 	 * @author Daniel J Griffiths
 	 *
@@ -1520,8 +1623,9 @@ class EDD_API {
 	public function get_download_logs( $customer_id = 0 ) {
 		global $edd_logs;
 
-		$downloads  = array();
-		$errors     = array();
+		$downloads        = array();
+		$errors           = array();
+		$invalid_customer = false;
 
 		$paged      = $this->get_paged();
 		$per_page   = $this->per_page();
@@ -1530,8 +1634,7 @@ class EDD_API {
 		$meta_query = array();
 		if ( ! empty( $customer_id ) ) {
 
-			$customer         = new EDD_Customer( $customer_id );
-			$invalid_customer = false;
+			$customer = new EDD_Customer( $customer_id );
 
 			if ( $customer->id > 0 ) {
 				$meta_query['relation'] = 'OR';
@@ -1609,7 +1712,67 @@ class EDD_API {
 
 		}
 
-		return $downloads;
+		return apply_filters( 'edd_api_download_logs', $downloads, $this );
+	}
+
+	/**
+	 * Process Get Info API Request
+	 *
+	 * @param array $args Arguments provided by API Request
+	 * @return array
+	 */
+	public function get_info() {
+		$data = array();
+
+		// plugin.php required to use is_plugin_active()
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+		// Integrations
+		if ( is_plugin_active( 'edd-commissions/edd-commissions.php' ) ) {
+			$data['info']['integrations']['commissions'] = true;
+		}
+
+		if ( class_exists( 'EDD_Software_Licensing' ) ) {
+			$data['info']['integrations']['software_licensing'] = true;
+		}
+
+		if ( class_exists( 'EDD_Front_End_Submissions' ) ) {
+			$data['info']['integrations']['fes'] = true;
+		}
+
+		if ( class_exists( 'EDD_Reviews' ) ) {
+			$data['info']['integrations']['reviews'] = true;
+		}
+
+		if ( class_exists( 'EDD_Recurring' ) ) {
+			$data['info']['integrations']['recurring'] = true;
+		}
+
+		// Permissions
+		if ( user_can( $this->user_id, 'view_shop_reports' ) ) {
+			$data['info']['permissions']['view_shop_reports'] = true;
+		}
+
+		if ( user_can( $this->user_id, 'view_shop_sensitive_data' ) ) {
+			$data['info']['permissions']['view_shop_sensitive_data'] = true;
+		}
+
+		if ( user_can( $this->user_id, 'manage_shop_discounts' ) ) {
+			$data['info']['permissions']['manage_shop_discounts'] = true;
+		}
+
+		// Site Information
+		if ( user_can( $this->user_id, 'view_shop_sensitive_data' ) ) {
+			$data['info']['site']['wp_version'] = get_bloginfo( 'version' );
+			$data['info']['site']['edd_version'] = EDD_VERSION;
+		}
+
+		$data['info']['site']['currency']            = edd_get_currency();
+		$data['info']['site']['currency_position']   = edd_get_option( 'currency_position', 'before' );
+		$data['info']['site']['decimal_separator']   = edd_get_option( 'decimal_separator', '.' );
+		$data['info']['site']['thousands_separator'] = edd_get_option( 'thousands_separator', ',' );
+
+		return apply_filters( 'edd_api_info', $data, $this );
 	}
 
 	/**
@@ -1641,8 +1804,9 @@ class EDD_API {
 	 * @return void
 	 */
 	private function log_request( $data = array() ) {
-		if ( ! $this->log_requests )
+		if ( ! $this->log_requests() ) {
 			return;
+		}
 
 		global $edd_logs, $wp_query;
 
@@ -1684,7 +1848,6 @@ class EDD_API {
 	/**
 	 * Retrieve the output data
 	 *
-	 * @access public
 	 * @since 1.5.2
 	 * @return array
 	 */
@@ -1715,9 +1878,11 @@ class EDD_API {
 
 			case 'xml' :
 
-				require_once EDD_PLUGIN_DIR . 'includes/libraries/array2xml.php';
-				$xml = Array2XML::createXML( 'edd', $this->data );
-				echo $xml->saveXML();
+				require_once EDD_PLUGIN_DIR . 'includes/libraries/class-ArrayToXML.php';
+				$arraytoxml = new ArrayToXML();
+				$xml        = $arraytoxml->buildXML( $this->data, 'edd' );
+
+				echo $xml;
 
 				break;
 
@@ -1751,7 +1916,6 @@ class EDD_API {
 	 *
 	 * Modifies the output of profile.php to add key generation/revocation
 	 *
-	 * @access public
 	 * @author Daniel J Griffiths
 	 * @since 1.5
 	 * @param object $user Current user info
@@ -1792,7 +1956,6 @@ class EDD_API {
 	/**
 	 * Process an API key generation/revocation
 	 *
-	 * @access public
 	 * @since 2.0.0
 	 * @param array $args
 	 * @return void
@@ -1850,11 +2013,10 @@ class EDD_API {
 	/**
 	 * Generate new API keys for a user
 	 *
-	 * @access public
 	 * @since 2.0.0
 	 * @param int $user_id User ID the key is being generated for
 	 * @param boolean $regenerate Regenerate the key for the user
-	 * @return boolean True if (re)generated succesfully, false otherwise.
+	 * @return boolean True if (re)generated successfully, false otherwise.
 	 */
 	public function generate_api_key( $user_id = 0, $regenerate = false ) {
 
@@ -1891,7 +2053,6 @@ class EDD_API {
 	/**
 	 * Revoke a users API keys
 	 *
-	 * @access public
 	 * @since 2.0.0
 	 * @param int $user_id User ID of user to revoke key for
 	 * @return string
@@ -1933,30 +2094,13 @@ class EDD_API {
 	 *
 	 * Generates the key requested by user_key_field and stores it in the database
 	 *
-	 * @access public
 	 * @author Daniel J Griffiths
 	 * @since 1.5
 	 * @param int $user_id
 	 * @return void
 	 */
 	public function update_key( $user_id ) {
-		if ( current_user_can( 'edit_user', $user_id ) && isset( $_POST['edd_set_api_key'] ) ) {
-
-			$user = get_userdata( $user_id );
-
-			$public_key = $this->get_user_public_key( $user_id );
-			$secret_key = $this->get_user_secret_key( $user_id );
-
-			if ( empty( $public_key ) ) {
-				$new_public_key = $this->generate_public_key( $user->user_email );
-				$new_secret_key = $this->generate_private_key( $user->ID );
-
-				update_user_meta( $user_id, $new_public_key, 'edd_user_public_key' );
-				update_user_meta( $user_id, $new_secret_key, 'edd_user_secret_key' );
-			} else {
-				$this->revoke_api_key( $user_id );
-			}
-		}
+		edd_update_user_api_key( $user_id );
 	}
 
 	/**
@@ -1967,7 +2111,7 @@ class EDD_API {
 	 * @param string $user_email
 	 * @return string
 	 */
-	private function generate_public_key( $user_email = '' ) {
+	public function generate_public_key( $user_email = '' ) {
 		$auth_key = defined( 'AUTH_KEY' ) ? AUTH_KEY : '';
 		$public   = hash( 'md5', $user_email . $auth_key . date( 'U' ) );
 		return $public;
@@ -1981,7 +2125,7 @@ class EDD_API {
 	 * @param int $user_id
 	 * @return string
 	 */
-	private function generate_private_key( $user_id = 0 ) {
+	public function generate_private_key( $user_id = 0 ) {
 		$auth_key = defined( 'AUTH_KEY' ) ? AUTH_KEY : '';
 		$secret   = hash( 'md5', $user_id . $auth_key . date( 'U' ) );
 		return $secret;
@@ -2070,6 +2214,52 @@ class EDD_API {
 
 		return $return;
 
+	}
+
+	/**
+	 * Sanitizes category and tag terms
+	 *
+	 * @access private
+	 * @since 2.6
+	 * @param mixed $term Request variable
+	 * @return mixed Sanitized term/s
+	 */
+	public function sanitize_request_term( $term ) {
+
+		if( is_array( $term ) ) {
+			$term = array_map( 'sanitize_text_field', $term );
+		} else if( is_int( $term ) ) {
+			$term = absint( $term );
+		} else {
+			$term = sanitize_text_field( $term );
+		}
+
+		return $term;
+
+	}
+
+	/**
+	 * Disable request logging
+	 *
+	 * @since  2.7
+	 */
+	public function log_requests() {
+		return apply_filters( 'edd_api_log_requests', true );
+	}
+
+	/**
+	 * Check API keys vs token
+	 *
+	 * @since  2.8.2
+	 *
+	 * @param string $secret Secret key
+	 * @param string $public Public key
+	 * @param string $token Token used in API request
+	 *
+	 * @return bool
+	 */
+	public function check_keys( $secret, $public, $token ) {
+		return hash_equals( md5( $secret . $public ), $token );
 	}
 
 }

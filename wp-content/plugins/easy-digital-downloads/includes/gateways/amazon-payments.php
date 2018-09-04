@@ -24,6 +24,7 @@ final class EDD_Amazon_Payments {
 	public $signin_redirect = null;
 	public $reference_id    = null;
 	public $doing_ipn       = false;
+	public $is_setup        = null;
 
 	/**
 	 * Get things going
@@ -53,7 +54,6 @@ final class EDD_Amazon_Payments {
 		$this->setup_client();
 		$this->filters();
 		$this->actions();
-
 
 	}
 
@@ -104,6 +104,38 @@ final class EDD_Amazon_Payments {
 	}
 
 	/**
+	 * Method to check if all the required settings have been filled out, allowing us to not output information without it.
+	 *
+	 * @since 2.7
+	 * @return bool
+	 */
+	public function is_setup() {
+		if ( null !== $this->is_setup ) {
+			return $this->is_setup;
+		}
+
+		$required_items = array( 'merchant_id', 'client_id', 'access_key', 'secret_key' );
+
+		$current_values = array(
+			'merchant_id' => edd_get_option( 'amazon_seller_id', '' ),
+			'client_id'   => edd_get_option( 'amazon_client_id', '' ),
+			'access_key'  => edd_get_option( 'amazon_mws_access_key', '' ),
+			'secret_key'  => edd_get_option( 'amazon_mws_secret_key', '' ),
+		);
+
+		$this->is_setup = true;
+
+		foreach ( $required_items as $key ) {
+			if ( empty( $current_values[ $key ] ) ) {
+				$this->is_setup = false;
+				break;
+			}
+		}
+
+		return $this->is_setup;
+	}
+
+	/**
 	 * Load additional files
 	 *
 	 * @access private
@@ -127,6 +159,10 @@ final class EDD_Amazon_Payments {
 	private function filters() {
 
 		add_filter( 'edd_accepted_payment_icons', array( $this, 'register_payment_icon' ), 10, 1 );
+		add_filter( 'edd_show_gateways', array( $this, 'maybe_hide_gateway_select' ) );
+
+		// Since the Amazon Gateway loads scripts on page, it needs the scripts to load in the header.
+		add_filter( 'edd_load_scripts_in_footer', '__return_false' );
 
 		if ( is_admin() ) {
 			add_filter( 'edd_settings_sections_gateways', array( $this, 'register_gateway_section' ), 1, 1 );
@@ -147,6 +183,7 @@ final class EDD_Amazon_Payments {
 
 		add_action( 'wp_enqueue_scripts',                      array( $this, 'print_client' ), 10 );
 		add_action( 'wp_enqueue_scripts',                      array( $this, 'load_scripts' ), 11 );
+		add_action( 'edd_pre_process_purchase',                array( $this, 'check_config' ), 1  );
 		add_action( 'init',                                    array( $this, 'capture_oauth' ), 9 );
 		add_action( 'init',                                    array( $this, 'signin_redirect' ) );
 		add_action( 'edd_purchase_form_before_register_login', array( $this, 'login_form' ) );
@@ -167,6 +204,18 @@ final class EDD_Amazon_Payments {
 	}
 
 	/**
+	 * Show an error message on checkout if Amazon is enabled but not setup.
+	 *
+	 * @since 2.7
+	 */
+	public function check_config() {
+		$is_enabled = edd_is_gateway_active( $this->gateway_id );
+		if ( ( ! $is_enabled || false === $this->is_setup() ) && 'amazon' == edd_get_chosen_gateway() ) {
+			edd_set_error( 'amazon_gateway_not_configured', __( 'There is an error with the Amazon Payments configuration.', 'easy-digital-downloads' ) );
+		}
+	}
+
+	/**
 	 * Retrieve the client object
 	 *
 	 * @access private
@@ -174,6 +223,10 @@ final class EDD_Amazon_Payments {
 	 * @return PayWithAmazon\Client
 	 */
 	private function get_client() {
+
+		if ( ! $this->is_setup() ) {
+			return false;
+		}
 
 		if ( ! is_null( $this->client ) ) {
 			return $this->client;
@@ -192,6 +245,10 @@ final class EDD_Amazon_Payments {
 	 * @return void
 	 */
 	private function setup_client() {
+
+		if ( ! $this->is_setup() ) {
+			return;
+		}
 
 		$region = edd_get_shop_country();
 
@@ -217,7 +274,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Register the gateway
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @param  $gateways array
 	 * @return array
@@ -242,7 +298,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Register the payment icon
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @param  array $payment_icons Array of payment icons
 	 * @return array                The array of icons with Amazon Added
@@ -251,6 +306,23 @@ final class EDD_Amazon_Payments {
 		$payment_icons['amazon'] = 'Amazon';
 
 		return $payment_icons;
+	}
+
+	/**
+	 * Hides payment gateway select options after return from Amazon
+	 *
+	 * @since  2.7.6
+	 * @param  bool $show Should gateway select be shown
+	 * @return bool
+	 */
+	public function maybe_hide_gateway_select( $show ) {
+
+		if( ! empty( $_REQUEST['payment-mode'] ) && 'amazon' == $_REQUEST['payment-mode'] && ! empty( $_REQUEST['amazon_reference_id'] ) && ! empty( $_REQUEST['state'] ) && 'authorized' == $_REQUEST['state'] ) {
+
+			$show = false;
+		}
+
+		return $show;
 	}
 
 	/**
@@ -269,7 +341,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Register the gateway settings
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @param  $gateway_settings array
 	 * @return array
@@ -351,11 +422,14 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Load javascript files and localized variables
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return void
 	 */
 	public function load_scripts() {
+
+		if ( ! $this->is_setup() ) {
+			return;
+		}
 
 		if ( ! edd_is_checkout() ) {
 			return;
@@ -425,11 +499,14 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Print client ID in header
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return void
 	 */
 	public function print_client() {
+
+		if ( ! $this->is_setup() ) {
+			return false;
+		}
 
 		if ( ! edd_is_checkout() ) {
 			return;
@@ -447,7 +524,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Capture authentication after returning from Amazon
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return void
 	 */
@@ -483,7 +559,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Set customer details after authentication
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return void
 	 */
@@ -558,11 +633,14 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Display the log in button
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return void
 	 */
 	public function login_form() {
+
+		if ( ! $this->is_setup() ) {
+			return false;
+		}
 
 		if ( empty( $this->reference_id ) && 'amazon' == edd_get_chosen_gateway() ) :
 
@@ -616,11 +694,15 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Display the wallet and address forms
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return void
 	 */
 	public function wallet_form() {
+
+		if ( ! $this->is_setup() ) {
+			return false;
+		}
+
 		$profile   = EDD()->session->get( 'amazon_profile' );
 		remove_action( 'edd_purchase_form_after_cc_form', 'edd_checkout_tax_fields', 999 );
 		ob_start(); ?>
@@ -634,8 +716,8 @@ final class EDD_Amazon_Payments {
 			<?php endif; ?>
 			<div id="edd-amazon-wallet-box"></div>
 			<script>
-				var edd_scripts;
-				if( '1' == edd_scripts.taxes_enabled ) {
+				var edd_global_vars;
+				if( '1' == edd_global_vars.taxes_enabled ) {
 					new OffAmazonPayments.Widgets.AddressBook({
 						sellerId: edd_amazon.sellerId,
 						amazonOrderReferenceId: edd_amazon.referenceID,
@@ -650,7 +732,7 @@ final class EDD_Amazon_Payments {
 									reference_id : edd_amazon.referenceID
 								},
 								dataType: "json",
-								url: edd_scripts.ajaxurl,
+								url: edd_global_vars.ajaxurl,
 								xhrFields: {
 									withCredentials: true
 								},
@@ -735,11 +817,14 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Retrieve the billing address via ajax
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return void
 	 */
 	public function ajax_get_address() {
+
+		if ( ! $this->is_setup() ) {
+			return false;
+		}
 
 		if( empty( $_POST['reference_id'] ) ) {
 			die( '-2' );
@@ -770,7 +855,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Check for errors during checkout
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @param  $valid_data Customer / product data from checkout
 	 * @param  $post_data $_POST
@@ -787,7 +871,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Process the purchase and create the charge in Amazon
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @param  $purchase_data array Cart details
 	 * @return void
@@ -889,7 +972,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Retrieve the checkout URL for Amazon after authentication is complete
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return string
 	 */
@@ -906,7 +988,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Retrieve the return URL for Amazon after authentication on Amazon is complete
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return string
 	 */
@@ -923,7 +1004,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Retrieve the URL to send customers too once sign-in is complete
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return string
 	 */
@@ -940,7 +1020,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Retrieve the IPN URL for Amazon
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return string
 	 */
@@ -955,7 +1034,6 @@ final class EDD_Amazon_Payments {
 	 *
 	 * Address is pulled directly from Amazon
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return void
 	 */
@@ -987,7 +1065,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Process IPN messages from Amazon
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return void
 	 */
@@ -1077,7 +1154,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Detect a refund action from EDD
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @param  $payment_id int The ID number of the payment being refunded
 	 * @param  $new_status string The new status assigned to the payment
@@ -1109,7 +1185,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Refund a charge in Amazon
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @param  $payment_id int The ID number of the payment being refunded
 	 * @return string
@@ -1168,7 +1243,6 @@ final class EDD_Amazon_Payments {
 	/**
 	 * Retrieve the URL for connecting Amazon account to EDD
 	 *
-	 * @access public
 	 * @since  2.4
 	 * @return string
 	 */
@@ -1201,7 +1275,6 @@ final class EDD_Amazon_Payments {
 /**
  * Load EDD_Amazon_Payments
  *
- * @access public
  * @since  2.4
  * @return object EDD_Amazon_Payments
  */

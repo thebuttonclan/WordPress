@@ -66,7 +66,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * This function renders most of the columns in the list table.
 	 *
-	 * @access public
 	 * @since 1.4
 	 *
 	 * @param array $item Contains all the data of the log item
@@ -80,12 +79,22 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 
 		switch ( $column_name ){
 			case 'download' :
-				$return = '<a href="' . add_query_arg( 'download', $item[ $column_name ] ) . '" >' . get_the_title( $item[ $column_name ] ) . '</a>';
+				$download_id = $item[ $column_name ];
+				$download    = new EDD_Download( $download_id );
+
+				$title = $download->post_title;
+				if ( edd_has_variable_prices( $download->ID ) ) {
+					$price_id = $item['price_id'];
+					if ( ! is_null( $price_id ) && ! empty( $download->prices[ $price_id] ) ) {
+						$title .= ' &mdash; ' . $download->prices[ $price_id ]['name'];
+					}
+				}
+
+				$return = '<a href="' . add_query_arg( 'download', $item[ $column_name ] ) . '" >' . $title . '</a>';
 				break;
 
-			case 'user_id' :
-				$user = ! empty( $item['user_id'] ) ? $item['user_id'] : edd_get_payment_user_email( $item['payment_id'] );
-				$return = '<a href="' . admin_url( 'edit.php?post_type=download&page=edd-payment-history&user=' . urlencode( $user ) ) . '">' . $item['user_name'] . '</a>';
+			case 'customer' :
+				$return = '<a href="' . admin_url( 'edit.php?post_type=download&page=edd-customers&view=overview&id=' . absint( $item['customer']->id ) ) . '">' . $item['customer']->name . '</a>';
 				break;
 
 			case 'item_price' :
@@ -111,14 +120,13 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * Retrieve the table columns
 	 *
-	 * @access public
 	 * @since 1.4
 	 * @return array $columns Array of all the list table columns
 	 */
 	public function get_columns() {
 		$columns = array(
 			'ID'         => __( 'Log ID', 'easy-digital-downloads' ),
-			'user_id'    => __( 'User', 'easy-digital-downloads' ),
+			'customer'   => __( 'Customer', 'easy-digital-downloads' ),
 			'download'   => edd_get_label_singular(),
 			'amount'     => __( 'Item Amount', 'easy-digital-downloads' ),
 			'payment_id' => __( 'Payment ID', 'easy-digital-downloads' ),
@@ -131,7 +139,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * Retrieve the current page number
 	 *
-	 * @access public
 	 * @since 1.4
 	 * @return int Current page number
 	 */
@@ -142,7 +149,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * Retrieves the user we are filtering logs by, if any
 	 *
-	 * @access public
 	 * @since 1.4
 	 * @return mixed int If User ID, string If Email/Login
 	 */
@@ -153,7 +159,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * Retrieves the ID of the download we're filtering logs by
 	 *
-	 * @access public
 	 * @since 1.4
 	 * @return int Download ID
 	 */
@@ -164,7 +169,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * Retrieves the search query string
 	 *
-	 * @access public
 	 * @since 1.4
 	 * @return string|false string If search is present, false otherwise
 	 */
@@ -177,7 +181,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	 *
 	 * This is used to return log entries that match our search query, user query, or download query
 	 *
-	 * @access public
 	 * @since 1.4
 	 * @return array $meta_query
 	 */
@@ -247,7 +250,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * Outputs the log views
 	 *
-	 * @access public
 	 * @since 1.4
 	 * @return void
 	 */
@@ -259,7 +261,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * Sets up the downloads filter
 	 *
-	 * @access public
 	 * @since 1.4
 	 * @return void
 	 */
@@ -289,7 +290,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * Gets the log entries for the current view
 	 *
-	 * @access public
 	 * @since 1.4
 	 * @global object $edd_logs EDD Logs Object
 	 * @return array $logs_data Array of all the Log entires
@@ -305,30 +305,42 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 		$download  = empty( $_GET['s'] ) ? $this->get_filtered_download() : null;
 
 		$log_query = array(
-			'post_parent' => $download,
-			'log_type'    => 'sale',
-			'paged'       => $paged,
-			'meta_query'  => $this->get_meta_query(),
+			'post_parent'    => $download,
+			'log_type'       => 'sale',
+			'paged'          => $paged,
+			'meta_query'     => $this->get_meta_query(),
+			'posts_per_page' => $this->per_page,
 		);
 
 		$logs = $edd_logs->get_connected_logs( $log_query );
 
 		if ( $logs ) {
 			foreach ( $logs as $log ) {
+
 				$payment_id = get_post_meta( $log->ID, '_edd_log_payment_id', true );
+				$payment    = new EDD_Payment( $payment_id );
 
 				// Make sure this payment hasn't been deleted
-				if ( get_post( $payment_id ) ) {
+				if ( ! empty( $payment->ID ) ) {
 
-					$user_info  = edd_get_payment_meta_user_info( $payment_id );
-					$cart_items = edd_get_payment_meta_cart_details( $payment_id );
+					$customer   = new EDD_Customer( $payment->customer_id );
+					$cart_items = $payment->cart_details;
 					$amount     = 0;
 
-					if ( is_array( $cart_items ) && is_array( $user_info ) ) {
+					if ( is_array( $cart_items ) ) {
 
 						foreach ( $cart_items as $item ) {
 
+							// If the item has variable pricing, make sure it's the right variation
 							if ( $item['id'] == $log->post_parent ) {
+								if ( isset( $item['item_number']['options']['price_id'] ) ) {
+									$log_price_id = get_post_meta( $log->ID, '_edd_log_price_id', true );
+
+									if ( (int) $item['item_number']['options']['price_id'] !== (int) $log_price_id ) {
+										continue;
+									}
+								}
+
 								$amount = isset( $item['price'] ) ? $item['price'] : $item['item_price'];
 								break;
 							}
@@ -337,21 +349,22 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 
 						$logs_data[] = array(
 							'ID'         => $log->ID,
-							'payment_id' => $payment_id,
+							'payment_id' => $payment->ID,
+							'customer'   => $customer,
 							'download'   => $log->post_parent,
+							'price_id'   => isset( $log_price_id ) ? $log_price_id : null,
 							'item_price' => isset( $item['item_price'] ) ? $item['item_price'] : $item['price'],
 							'amount'     => $amount,
-							'user_id'    => $user_info['id'],
-							'user_name'  => $user_info['first_name'] . ' ' . $user_info['last_name'],
 							'date'       => get_post_field( 'post_date', $payment_id ),
 							'quantity'   => $item['quantity'],
 							// Keep track of the currency. Vital to produce the correct report
-							'currency'   => $item['currency'],
+							'currency'   => $payment->currency,
 						);
 
 					}
 
 				}
+
 			}
 		}
 
@@ -361,7 +374,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * Setup the final data for the table
 	 *
-	 * @access public
 	 * @since 1.4
 	 * @global object $edd_logs EDD Logs Object
 	 * @uses EDD_Sales_Log_Table::get_columns()
@@ -392,7 +404,6 @@ class EDD_Sales_Log_Table extends WP_List_Table {
 	/**
 	 * Since our "bulk actions" are navigational, we want them to always show, not just when there's items
 	 *
-	 * @access public
 	 * @since 2.5
 	 * @return bool
 	 */

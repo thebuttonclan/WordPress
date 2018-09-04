@@ -33,7 +33,9 @@ function edd_checkout_cart() {
 	do_action( 'edd_before_checkout_cart' );
 	echo '<form id="edd_checkout_cart_form" method="post">';
 		echo '<div id="edd_checkout_cart_wrap">';
+			do_action( 'edd_checkout_cart_top' );
 			edd_get_template_part( 'checkout_cart' );
+			do_action( 'edd_checkout_cart_bottom' );
 		echo '</div>';
 	echo '</form>';
 	do_action( 'edd_after_checkout_cart' );
@@ -56,10 +58,11 @@ function edd_shopping_cart( $echo = false ) {
 
 	do_action( 'edd_after_cart' );
 
-	if ( $echo )
+	if ( $echo ) {
 		echo ob_get_clean();
-	else
+	} else {
 		return ob_get_clean();
+	}
 }
 
 /**
@@ -135,11 +138,31 @@ add_action( 'edd_cart_empty', 'edd_empty_checkout_cart' );
  * @return int The number of columns
  */
 function edd_checkout_cart_columns() {
-	$head_first = did_action( 'edd_checkout_table_header_first' );
-	$head_last  = did_action( 'edd_checkout_table_header_last' );
-	$default    = 3;
+	global $wp_filter, $wp_version;
 
-	return apply_filters( 'edd_checkout_cart_columns', $head_first + $head_last + $default );
+	$columns_count = 3;
+
+	if ( ! empty( $wp_filter['edd_checkout_table_header_first'] ) ) {
+		$header_first_count = 0;
+		$callbacks = version_compare( $wp_version, '4.7', '>=' ) ? $wp_filter['edd_checkout_table_header_first']->callbacks : $wp_filter['edd_checkout_table_header_first'] ;
+
+		foreach ( $callbacks as $callback ) {
+			$header_first_count += count( $callback );
+		}
+		$columns_count += $header_first_count;
+	}
+
+	if ( ! empty( $wp_filter['edd_checkout_table_header_last'] ) ) {
+		$header_last_count = 0;
+		$callbacks = version_compare( $wp_version, '4.7', '>=' ) ? $wp_filter['edd_checkout_table_header_last']->callbacks : $wp_filter['edd_checkout_table_header_last'] ;
+
+		foreach ( $callbacks as $callback ) {
+			$header_last_count += count( $callback );
+		}
+		$columns_count += $header_last_count;
+	}
+
+	return apply_filters( 'edd_checkout_cart_columns', $columns_count );
 }
 
 /**
